@@ -11,6 +11,7 @@ uses
   Reverse.Graph in 'src\Reverse.Graph.pas',
   Reverse.Scope in 'src\Reverse.Scope.pas',
   Reverse.MSBuild in 'src\Reverse.MSBuild.pas',
+  Reverse.DelphiPaths in 'src\Reverse.DelphiPaths.pas',
   Reverse.Log in 'src\Reverse.Log.pas',
   Reverse.Analysis in 'src\Reverse.Analysis.pas',
   Reverse.Output in 'src\Reverse.Output.pas';

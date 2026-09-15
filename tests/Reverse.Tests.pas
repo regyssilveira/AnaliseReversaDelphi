@@ -52,6 +52,7 @@ type
     [Test] procedure EvaluatesOnlySelectedConfigurationPaths;
     [Test] procedure MarksMsbuildFailureAsPartial;
     [Test] procedure FindsUnitRecursivelyInAdditionalSourceRoot;
+    [Test] procedure UsesInjectedGlobalPathProvider;
   end;
 
 implementation
@@ -59,6 +60,27 @@ implementation
 uses Reverse.AST, Reverse.Scope, Reverse.Analysis, Reverse.Output, Reverse.Log,
   Reverse.MSBuild,
   System.SysUtils, System.IOUtils, SimpleParser.Lexer.Types;
+
+type
+  TFixedPathProvider = class(TInterfacedObject, IGlobalSourcePathProvider)
+  private
+    FDirectory: string;
+  public
+    constructor Create(const Directory: string);
+    function Paths(const Platform, ProjectRoot: string): TArray<string>;
+  end;
+
+constructor TFixedPathProvider.Create(const Directory: string);
+begin
+  inherited Create;
+  FDirectory := Directory;
+end;
+
+function TFixedPathProvider.Paths(const Platform,
+  ProjectRoot: string): TArray<string>;
+begin
+  Result := [FDirectory];
+end;
 
 procedure TGraphTests.Setup;
 begin
@@ -567,6 +589,47 @@ begin
       Assert.AreEqual(NativeInt(3), Scope.Files.Count);
       Assert.AreEqual(NativeInt(2), Length(Analysis.Reachable));
       Assert.IsTrue(Analysis.Paths[0].Contains('[DPR]'));
+      Assert.AreEqual(0, Analysis.UnresolvedCount);
+    finally
+      Analysis.Free;
+    end;
+  finally
+    Analyzer.Free;
+    Scope.Free;
+  end;
+end;
+
+procedure TWorkflowTests.UsesInjectedGlobalPathProvider;
+var
+  Root, ProjectRoot, LibraryRoot, ProjectFile: string;
+  Logger: ILogger;
+  Scope: TProjectScope;
+  Analyzer: TAnalyzer;
+  Analysis: TAnalysisResult;
+begin
+  Root := TPath.GetFullPath('bin\global-path-provider-test');
+  ProjectRoot := TPath.Combine(Root, 'Project');
+  LibraryRoot := TPath.Combine(Root, 'Library');
+  TDirectory.CreateDirectory(ProjectRoot);
+  TDirectory.CreateDirectory(LibraryRoot);
+  TFile.WriteAllText(TPath.Combine(LibraryRoot, 'InjectedTarget.pas'),
+    'unit InjectedTarget; interface implementation end.');
+  TFile.WriteAllText(TPath.Combine(ProjectRoot, 'Injected.dpr'),
+    'program Injected; uses InjectedTarget; begin end.');
+  ProjectFile := TPath.Combine(ProjectRoot, 'Injected.dproj');
+  TFile.WriteAllText(ProjectFile,
+    '<Project><PropertyGroup><MainSource>Injected.dpr</MainSource>' +
+    '</PropertyGroup></Project>');
+  Logger := TFileLogger.Create(TPath.Combine(Root, 'analysis.log'));
+  Scope := TProjectScope.Create(ProjectFile, Logger, 'Win64', True, '', nil,
+    nil, TFixedPathProvider.Create(LibraryRoot));
+  Analyzer := TAnalyzer.Create(TAstUnitParser.Create(
+    Scope.SearchDirectories.ToArray, Logger), Logger);
+  try
+    Analysis := Analyzer.Run(Scope, 'InjectedTarget');
+    try
+      Assert.AreEqual(NativeInt(2), Scope.Files.Count);
+      Assert.AreEqual(NativeInt(1), Length(Analysis.Reachable));
       Assert.AreEqual(0, Analysis.UnresolvedCount);
     finally
       Analysis.Free;

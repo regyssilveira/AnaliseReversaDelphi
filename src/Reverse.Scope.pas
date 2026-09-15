@@ -10,9 +10,9 @@ type
     FFiles: TList<string>;
     FSeen: TDictionary<string, Boolean>;
     FSearchDirectories: TList<string>;
-    FVariables: TDictionary<string, string>;
     FNamespaceOrder: TList<string>;
     FLogger: ILogger;
+    FGlobalPaths: IGlobalSourcePathProvider;
     FRoot: string;
     FProgramFile: string;
     FPlatform: string;
@@ -23,13 +23,13 @@ type
     procedure ReadSearchPaths(const ProjectFile: string);
     procedure ReadProgramReferences;
     procedure ReadGlobalSearchPaths(const Platform: string);
-    function ExpandPathVariables(const PathName, Platform: string): string;
   public
     constructor Create(const ProjectFile: string; const Logger: ILogger;
       const Platform: string = '';
       UseGlobalSearchPaths: Boolean = True; const Config: string = '';
       const PathEvaluator: IProjectPathEvaluator = nil;
-      const AdditionalSourceRoots: TArray<string> = nil);
+      const AdditionalSourceRoots: TArray<string> = nil;
+      const GlobalPaths: IGlobalSourcePathProvider = nil);
     destructor Destroy; override;
     property Files: TList<string> read FFiles;
     property ProgramFile: string read FProgramFile;
@@ -42,13 +42,14 @@ type
 
 implementation
 
-uses System.SysUtils, System.IOUtils, System.Classes, System.RegularExpressions,
-  System.Win.Registry, Winapi.Windows;
+uses System.SysUtils, System.IOUtils, System.RegularExpressions,
+  Reverse.DelphiPaths;
 
 constructor TProjectScope.Create(const ProjectFile: string; const Logger: ILogger;
   const Platform: string; UseGlobalSearchPaths: Boolean; const Config: string;
   const PathEvaluator: IProjectPathEvaluator;
-  const AdditionalSourceRoots: TArray<string>);
+  const AdditionalSourceRoots: TArray<string>;
+  const GlobalPaths: IGlobalSourcePathProvider);
 var
   ProjectText: string;
   MainMatch: TMatch;
@@ -58,6 +59,9 @@ begin
     raise Exception.Create('Project not found: ' + ProjectFile);
   FLogger := Logger;
   FPathEvaluator := PathEvaluator;
+  FGlobalPaths := GlobalPaths;
+  if (FGlobalPaths = nil) and UseGlobalSearchPaths then
+    FGlobalPaths := TDelphiPathProvider.Create(Logger);
   FRoot := ExtractFilePath(ExpandFileName(ProjectFile));
   FProgramFile := ChangeFileExt(ExpandFileName(ProjectFile), '.dpr');
   ProjectText := TFile.ReadAllText(ProjectFile);
@@ -90,7 +94,6 @@ begin
     raise Exception.Create('DPR not found: ' + FProgramFile);
   FFiles := TList<string>.Create;
   FSeen := TDictionary<string, Boolean>.Create;
-  FVariables := TDictionary<string, string>.Create;
   FNamespaceOrder := TList<string>.Create;
   FSearchDirectories := TList<string>.Create;
   FSearchDirectories.Add(FRoot);
@@ -153,7 +156,6 @@ destructor TProjectScope.Destroy;
 begin
   FFiles.Free;
   FSeen.Free;
-  FVariables.Free;
   FNamespaceOrder.Free;
   FSearchDirectories.Free;
   inherited;
@@ -251,127 +253,21 @@ begin
   end;
 end;
 
-function TProjectScope.ExpandPathVariables(const PathName,
-  Platform: string): string;
-var
-  Match: TMatch;
-  Name, Value: string;
-  I: Integer;
-begin
-  Result := PathName;
-  for I := 1 to 8 do
-  begin
-    Match := TRegEx.Match(Result, '\$\(([^)]+)\)');
-    if not Match.Success then Break;
-    Name := LowerCase(Match.Groups[1].Value);
-    if (Name = 'dcc_unitsearchpath') or (Name = 'dcc_includepath') then
-      Value := ''
-    else if Name = 'platform' then Value := Platform
-    else if not FVariables.TryGetValue(Name, Value) then
-      Value := GetEnvironmentVariable(Match.Groups[1].Value);
-    if Value = '' then
-    begin
-      if (Name <> 'dcc_unitsearchpath') and (Name <> 'dcc_includepath') then
-      begin
-        FLogger.Write('WARN', 'unresolved-path-variable', PathName);
-        Exit('');
-      end;
-    end;
-    Result := Result.Replace(Match.Value, Value);
-  end;
-  if Result.Contains('$(') then
-  begin
-    FLogger.Write('WARN', 'recursive-path-variable', PathName);
-    Result := '';
-  end;
-end;
-
 procedure TProjectScope.ReadGlobalSearchPaths(const Platform: string);
 var
-  Registry: TRegistry;
-  Names: TStringList;
-  Raw, BrowseRaw, Item, PathName, BdsRoot: string;
-  Name: string;
-  Match: TMatch;
+  PathName: string;
 begin
-  Registry := TRegistry.Create(KEY_READ or KEY_WOW64_32KEY);
-  Names := TStringList.Create;
-  try
-    Registry.RootKey := HKEY_LOCAL_MACHINE;
-    if Registry.OpenKeyReadOnly('SOFTWARE\Embarcadero\BDS\37.0') then
+  if FGlobalPaths = nil then Exit;
+  for PathName in FGlobalPaths.Paths(Platform, FRoot) do
+  begin
+    if not DirectoryExists(PathName) then
     begin
-      BdsRoot := Registry.ReadString('RootDir');
-      FVariables.AddOrSetValue('bds', BdsRoot);
-      FVariables.AddOrSetValue('bdslib', TPath.Combine(BdsRoot, 'lib'));
-      Registry.CloseKey;
+      FLogger.Write('WARN', 'global-search-path-missing', PathName);
+      Continue;
     end;
-    Registry.RootKey := HKEY_CURRENT_USER;
-    if not FVariables.ContainsKey('bds') and
-      Registry.OpenKeyReadOnly('Software\Embarcadero\BDS\37.0') then
-    begin
-      BdsRoot := Registry.ReadString('RootDir');
-      FVariables.AddOrSetValue('bds', BdsRoot);
-      FVariables.AddOrSetValue('bdslib', TPath.Combine(BdsRoot, 'lib'));
-      Registry.CloseKey;
-    end;
-    if Registry.OpenKeyReadOnly('Software\Embarcadero\BDS\37.0\Environment Variables') then
-    begin
-      Registry.GetValueNames(Names);
-      for Name in Names do
-        if Registry.GetDataType(Name) in [rdString, rdExpandString] then
-          FVariables.AddOrSetValue(LowerCase(Name), Registry.ReadString(Name));
-      Registry.CloseKey;
-    end;
-    if not Registry.OpenKeyReadOnly('Software\Embarcadero\BDS\37.0\Library\' + Platform) then
-    begin
-      FLogger.Write('WARN', 'global-search-path-unavailable', Platform);
-      Exit;
-    end;
-    Raw := Registry.ReadString('Search Path');
-    BrowseRaw := '';
-    if Registry.ValueExists('Browsing Path') then
-      BrowseRaw := Registry.ReadString('Browsing Path');
-    Registry.CloseKey;
-    if not FVariables.ContainsKey('dxvcl') then
-    begin
-      Match := TRegEx.Match(Raw,
-        '([A-Za-z]:\\[^;]*?\\DevExpress)\\Library\\', [roIgnoreCase]);
-      if Match.Success then
-      begin
-        FVariables.Add('dxvcl', Match.Groups[1].Value);
-        FLogger.Write('INFO', 'inferred-path-variable',
-          'DXVCL | ' + Match.Groups[1].Value);
-      end;
-    end;
-    FLogger.Write('INFO', 'global-search-path', Platform + ' | ' +
-      Length(Raw.Split([';'])).ToString + ' entries');
-    for Item in Raw.Split([';']) do
-    begin
-      PathName := Trim(ExpandPathVariables(Item, Platform));
-      if PathName = '' then Continue;
-      if not TPath.IsPathRooted(PathName) then
-        PathName := TPath.GetFullPath(TPath.Combine(FRoot, PathName));
-      if not DirectoryExists(PathName) then Continue;
-      if not FSearchDirectories.Contains(PathName) then
-        FSearchDirectories.Add(PathName);
-      ScanDirectory(PathName, False);
-    end;
-    FLogger.Write('INFO', 'global-browsing-path',
-      Length(BrowseRaw.Split([';'])).ToString + ' entries');
-    for Item in BrowseRaw.Split([';']) do
-    begin
-      PathName := Trim(ExpandPathVariables(Item, Platform));
-      if PathName = '' then Continue;
-      if not TPath.IsPathRooted(PathName) then
-        PathName := TPath.GetFullPath(TPath.Combine(FRoot, PathName));
-      if not DirectoryExists(PathName) then Continue;
-      if not FSearchDirectories.Contains(PathName) then
-        FSearchDirectories.Add(PathName);
-      ScanDirectory(PathName, False);
-    end;
-  finally
-    Names.Free;
-    Registry.Free;
+    if not FSearchDirectories.Contains(PathName) then
+      FSearchDirectories.Add(PathName);
+    ScanDirectory(PathName, False);
   end;
 end;
 

@@ -38,6 +38,11 @@ type
       PropertyName: string): TArray<string>;
   end;
 
+  IGlobalSourcePathProvider = interface
+    ['{A04CB2BD-9D53-45D6-8CE0-A965A12478C4}']
+    function Paths(const Platform, ProjectRoot: string): TArray<string>;
+  end;
+
 function Key(const Name: string): string;
 
 implementation
