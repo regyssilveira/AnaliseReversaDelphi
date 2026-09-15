@@ -32,7 +32,7 @@ O executável para testes locais fica em `bin\Win64\UnitBacktrace.exe`. A análi
 
 A saída elimina linhas exatamente iguais de caminhos e evidências, além de declarações de nós e ligações repetidas no DOT. Relações com arquivo, seção ou linha diferentes continuam separadas. Projetos com muitos ramos podem produzir milhares de caminhos distintos mesmo após essa limpeza; a lista textual mantém o limite de 10.000 caminhos, enquanto o grafo conserva as ligações alcançáveis.
 
-Durante a execução, o console informa a descoberta de arquivos, a análise dos fontes e a resolução das dependências. As contagens e porcentagens usam o total conhecido de cada etapa; a montagem do grafo aparece como etapa em andamento até terminar. As mensagens são limitadas a uma atualização a cada 500 ms por etapa, além do início e do fim. Exemplo:
+Durante a execução, o console informa a descoberta de arquivos, a análise dos fontes e a resolução das dependências. As contagens e porcentagens usam o total conhecido de cada etapa; a montagem do grafo aparece como etapa em andamento até terminar. Em um terminal interativo, cada etapa atualiza a mesma linha e só a conclusão fica no histórico. Quando a saída é redirecionada, as atualizações ficam em linhas separadas para preservar um log legível. A frequência é limitada a uma atualização a cada 500 ms por etapa, além do início e do fim. Exemplo do histórico após a conclusão:
 
 ```text
 Preparando projeto e descobrindo arquivos...

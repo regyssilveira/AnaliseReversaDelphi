@@ -149,6 +149,8 @@ begin
     TConsoleProgress.FormatLine('Analisando arquivos', 5, 20));
   Assert.AreEqual('Montando grafo reverso...',
     TConsoleProgress.FormatLine('Montando grafo reverso', 0, 0));
+  Assert.AreEqual(#13 + 'Novo' + '   ',
+    TConsoleProgress.RewriteLine('Novo', 7));
 end;
 
 procedure TGraphTests.TearDown;
