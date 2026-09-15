@@ -418,6 +418,10 @@ begin
         .Contains('Mostrar somente caminhos até o DPR'));
       Assert.IsTrue(TFile.ReadAllText(TPath.Combine(OutputDir, 'graph.html'))
         .Contains('section:"interface"'));
+      Assert.IsTrue(TFile.ReadAllText(TPath.Combine(OutputDir, 'graph.html'))
+        .Contains('Ver ligações da unit selecionada'));
+      Assert.IsTrue(TFile.ReadAllText(TPath.Combine(OutputDir, 'graph.html'))
+        .Contains('Ver caminho da seleção até o DPR'));
     finally
       Analysis.Free;
     end;

@@ -28,7 +28,7 @@ cd delphi-unit-backtrace
 
 O script usa a instalação local `C:\Program Files (x86)\Embarcadero\Studio\37.0`. Para outro local, ajuste `$bdsRoot` em `tools/Build.ps1`. Os projetos `.dproj` também estão na raiz. DUnitX acompanha o RAD Studio 13; o DelphiAST é um submódulo Git.
 
-O executável para testes locais fica em `bin\Win64\UnitBacktrace.exe`. A análise gera `result.txt`, `graph.dot`, `graph.html` e `analysis.log` na pasta indicada por `--output`. Abra `graph.html` no navegador para explorar o grafo sem instalar dependências. O painel permite buscar uma unit ou arquivo, destacar caminhos que chegam ao DPR e selecionar uma ligação para ver o arquivo e a linha do `uses`. O cabeçalho indica quando a análise é parcial.
+O executável para testes locais fica em `bin\Win64\UnitBacktrace.exe`. A análise gera `result.txt`, `graph.dot`, `graph.html` e `analysis.log` na pasta indicada por `--output`. Abra `graph.html` no navegador para explorar o grafo sem instalar dependências. A busca lista até 30 units encontradas e centraliza a seleção. Você pode ver apenas suas ligações diretas, o caminho mais curto da seleção até o DPR ou todos os caminhos que chegam ao DPR. Clique em uma ligação para ver o arquivo e a linha do `uses`. O cabeçalho indica quando a análise é parcial.
 
 A saída elimina linhas exatamente iguais de caminhos e evidências, além de declarações de nós e ligações repetidas no DOT. Relações com arquivo, seção ou linha diferentes continuam separadas. Projetos com muitos ramos podem produzir milhares de caminhos distintos mesmo após essa limpeza; a lista textual mantém o limite de 10.000 caminhos, enquanto o grafo conserva as ligações alcançáveis.
 
