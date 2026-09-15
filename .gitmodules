@@ -1,0 +1,3 @@
+[submodule "vendor/DelphiAST"]
+	path = vendor/DelphiAST
+	url = https://github.com/RomanYankovsky/DelphiAST.git

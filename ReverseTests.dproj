@@ -1,0 +1,18 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <ProjectGuid>{32674B23-C9DD-42E6-A88E-241E11A9566A}</ProjectGuid>
+    <ProjectVersion>19.0</ProjectVersion>
+    <MainSource>ReverseTests.dpr</MainSource>
+    <Config Condition="'$(Config)'==''">Debug</Config>
+    <Platform Condition="'$(Platform)'==''">Win32</Platform>
+    <TargetedPlatforms>1</TargetedPlatforms>
+    <AppType>Console</AppType>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Base)'!='' or '$(Config)'!=''">
+    <DCC_UnitSearchPath>src;tests;vendor\DelphiAST\Source;vendor\DelphiAST\Source\SimpleParser;$(BDS)\source\DUnitX;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
+    <DCC_Namespace>System;Winapi;Vcl;Xml;$(DCC_Namespace)</DCC_Namespace>
+    <DCC_ExeOutput>bin</DCC_ExeOutput>
+    <DCC_DcuOutput>obj</DCC_DcuOutput>
+  </PropertyGroup>
+  <Import Project="$(BDS)\Bin\CodeGear.Delphi.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Delphi.Targets')"/>
+</Project>

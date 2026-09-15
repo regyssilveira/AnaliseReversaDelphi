@@ -1,0 +1,72 @@
+program ReverseDependencies;
+
+{$APPTYPE CONSOLE}
+
+uses
+  System.SysUtils,
+  System.IOUtils,
+  Reverse.Domain in 'src\Reverse.Domain.pas',
+  Reverse.AST in 'src\Reverse.AST.pas',
+  Reverse.Graph in 'src\Reverse.Graph.pas',
+  Reverse.Scope in 'src\Reverse.Scope.pas',
+  Reverse.Log in 'src\Reverse.Log.pas',
+  Reverse.Analysis in 'src\Reverse.Analysis.pas',
+  Reverse.Output in 'src\Reverse.Output.pas';
+
+function OptionValue(const Option: string): string;
+var
+  I: Integer;
+begin
+  Result := '';
+  for I := 1 to ParamCount - 1 do
+    if SameText(ParamStr(I), Option) then Exit(ParamStr(I + 1));
+end;
+
+var
+  ProjectFile, Target, OutputDir: string;
+  Logger: ILogger;
+  Scope: TProjectScope;
+  Analyzer: TAnalyzer;
+  Analysis: TAnalysisResult;
+begin
+  try
+    ProjectFile := OptionValue('--project');
+    Target := OptionValue('--unit');
+    if (ProjectFile = '') or (Target = '') then
+    begin
+      Writeln('Usage: ReverseDependencies --project FILE.dproj --unit UnitName [--output DIR]');
+      ExitCode := 2;
+      Exit;
+    end;
+    OutputDir := OptionValue('--output');
+    if OutputDir = '' then OutputDir := TPath.Combine(GetCurrentDir, 'analysis-output');
+    TDirectory.CreateDirectory(OutputDir);
+    Logger := TFileLogger.Create(TPath.Combine(OutputDir, 'analysis.log'));
+    Logger.Write('INFO', 'start', ProjectFile + ' | ' + Target);
+    Scope := TProjectScope.Create(ProjectFile, Logger);
+    try
+      Analyzer := TAnalyzer.Create(TAstUnitParser.Create, Logger);
+      try
+        Analysis := Analyzer.Run(Scope, Target);
+        try
+          TOutputWriter.WriteFiles(Analysis, OutputDir);
+          Writeln('Done: ' + OutputDir);
+          if Analysis.FailedCount > 0 then ExitCode := 3;
+        finally
+          Analysis.Free;
+        end;
+      finally
+        Analyzer.Free;
+      end;
+    finally
+      Scope.Free;
+    end;
+  except
+    on E: Exception do
+    begin
+      if Logger <> nil then Logger.Write('ERROR', 'fatal', E.Message);
+      Writeln(ErrOutput, E.ClassName, ': ', E.Message);
+      ExitCode := 1;
+    end;
+  end;
+end.
