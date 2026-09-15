@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 param([switch]$Tests, [ValidateSet('Win32','Win64')][string]$Platform='Win32')
 
 $bdsRoot = 'C:\Program Files (x86)\Embarcadero\Studio\37.0'

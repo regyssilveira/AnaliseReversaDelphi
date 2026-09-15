@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 param(
     [int]$UnitCount = 2200,
     [string]$Destination = 'bin/stress-fixture'
