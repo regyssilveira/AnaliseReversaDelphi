@@ -2,7 +2,17 @@
 
 [README em inglês](README.en.md)
 
-Ferramenta console para responder **quem usa uma unit Delphi e por quais caminhos ela chega ao DPR**. A entrada obrigatória é o arquivo `.dproj` e o nome da unit; o caminho do `.pas` é descoberto pelo programa. O resultado contém os caminhos reversos em `result.txt`, todas as ligações alcançáveis em `graph.dot` e decisões de análise em `analysis.log`.
+Ferramenta console para responder **quem usa uma unit Delphi e por quais caminhos ela chega ao DPR**. A entrada obrigatória é o arquivo `.dproj` e o nome da unit; o caminho do `.pas` é descoberto pelo programa. O resultado contém os caminhos reversos em `result.txt`, um grafo navegável em `graph.html`, as ligações em `graph.dot` e decisões de análise em `analysis.log`.
+
+## Baixar e executar
+
+Baixe o ZIP Win64 ou Win32 na [página da versão mais recente](https://github.com/regyssilveira/delphi-unit-backtrace/releases/latest) e extraia os arquivos. No diretório do projeto, execute:
+
+```powershell
+D:\Ferramentas\UnitBacktrace.exe --project MeuERP.dproj --unit uExtrator
+```
+
+O executável usa `analysis-output` no diretório atual quando `--output` não é informado. Abra `analysis-output\graph.html` no navegador. Se a análise for parcial (código de saída `3`), consulte `analysis.log` antes de decidir quais declarações `uses` alterar. O ZIP inclui as licenças e avisos das dependências.
 
 ```powershell
 UnitBacktrace.exe --project "D:\MeuERP\MeuERP.dproj" --unit uExtrator --output "D:\Analise"

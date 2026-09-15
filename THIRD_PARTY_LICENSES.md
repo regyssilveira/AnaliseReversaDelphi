@@ -7,7 +7,8 @@ submodule retains its upstream licenses; it is not relicensed by this project.
 
 The [DelphiAST project](https://github.com/RomanYankovsky/DelphiAST/tree/38402535ad6018b981f08920836aac99b554cb86)
 states that it is licensed under MPL-2.0. Its license text is preserved at
-[vendor/DelphiAST/LICENSE](vendor/DelphiAST/LICENSE). The submodule is pinned
+[vendor/DelphiAST/LICENSE](vendor/DelphiAST/LICENSE) in the source repository
+and included as `licenses/DelphiAST-MPL-2.0.txt` in release ZIPs. The submodule is pinned
 to commit `38402535ad6018b981f08920836aac99b554cb86`.
 
 Four parser files compiled into the application carry separate MPL-1.1
@@ -20,6 +21,6 @@ notices in their source headers:
 
 Their license text is included in [licenses/MPL-1.1.txt](licenses/MPL-1.1.txt).
 The original source and its notices are available in the pinned DelphiAST
-submodule above. Recipients of a locally built executable can obtain the exact
+submodule above. Recipients of a release or locally built executable can obtain the exact
 source by cloning this project with `--recurse-submodules` at the Git commit
 used for that build, or by opening the pinned upstream commit.

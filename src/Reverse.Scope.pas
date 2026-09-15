@@ -86,6 +86,8 @@ begin
     if ConfigMatch.Success then FConfig := ConfigMatch.Groups[1].Value
     else FConfig := 'Debug';
   end;
+  if not SameText(FConfig, 'Debug') and not SameText(FConfig, 'Release') then
+    raise Exception.Create('Unsupported config: ' + FConfig);
   FLogger.Write('INFO', 'platform', FPlatform);
   FLogger.Write('INFO', 'config', FConfig);
   MainMatch := TRegEx.Match(ProjectText, '<MainSource>(.*?)</MainSource>',

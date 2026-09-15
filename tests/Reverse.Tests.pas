@@ -55,6 +55,7 @@ type
     [Test] procedure UsesRelativeLibrarySearchPath;
     [Test] procedure ResolvesLegacyNameToNamespacedUnit;
     [Test] procedure InfersDefaultPlatformFromProject;
+    [Test] procedure RejectsUnsupportedConfiguration;
     [Test] procedure EvaluatesOnlySelectedConfigurationPaths;
     [Test] procedure MarksMsbuildFailureAsPartial;
     [Test] procedure FindsUnitRecursivelyInAdditionalSourceRoot;
@@ -681,6 +682,18 @@ begin
   finally
     Scope.Free;
   end;
+end;
+
+procedure TWorkflowTests.RejectsUnsupportedConfiguration;
+var
+  Logger: ILogger;
+begin
+  Logger := TFileLogger.Create(TPath.GetFullPath('bin\invalid-config-test.log'));
+  Assert.WillRaise(procedure begin
+    TProjectScope.Create(TPath.GetFullPath(
+      'tests\fixtures\Small\Small.dproj'), Logger, 'Win64', False,
+      'Debug" /p:Unexpected=true');
+  end, Exception);
 end;
 
 procedure TWorkflowTests.EvaluatesOnlySelectedConfigurationPaths;

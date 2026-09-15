@@ -2,7 +2,17 @@
 
 [Portuguese README](README.md)
 
-Console tool answering **which Delphi units use a selected unit, and through which paths it reaches the DPR**. Only a `.dproj` file and the unit name are required; the program finds the `.pas` file. Outputs are reverse paths in `result.txt`, all reachable links in `graph.dot`, and analysis decisions in `analysis.log`.
+Console tool answering **which Delphi units use a selected unit, and through which paths it reaches the DPR**. Only a `.dproj` file and the unit name are required; the program finds the `.pas` file. Outputs are reverse paths in `result.txt`, a navigable graph in `graph.html`, links in `graph.dot`, and analysis decisions in `analysis.log`.
+
+## Download and run
+
+Download the Win64 or Win32 ZIP from the [latest release page](https://github.com/regyssilveira/delphi-unit-backtrace/releases/latest) and extract it. From the project directory, run:
+
+```powershell
+D:\Tools\UnitBacktrace.exe --project MyApp.dproj --unit uExtractor
+```
+
+Without `--output`, files go to `analysis-output` in the current directory. Open `analysis-output\graph.html` in a browser. If the analysis is partial (exit code `3`), review `analysis.log` before changing `uses` declarations. The ZIP includes third-party licenses and notices.
 
 ```powershell
 UnitBacktrace.exe --project "D:\MyApp\MyApp.dproj" --unit uExtractor --output "D:\Analysis"
