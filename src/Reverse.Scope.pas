@@ -28,7 +28,8 @@ type
     constructor Create(const ProjectFile: string; const Logger: ILogger;
       const Platform: string = '';
       UseGlobalSearchPaths: Boolean = True; const Config: string = '';
-      const PathEvaluator: IProjectPathEvaluator = nil);
+      const PathEvaluator: IProjectPathEvaluator = nil;
+      const AdditionalSourceRoots: TArray<string> = nil);
     destructor Destroy; override;
     property Files: TList<string> read FFiles;
     property ProgramFile: string read FProgramFile;
@@ -46,7 +47,8 @@ uses System.SysUtils, System.IOUtils, System.Classes, System.RegularExpressions,
 
 constructor TProjectScope.Create(const ProjectFile: string; const Logger: ILogger;
   const Platform: string; UseGlobalSearchPaths: Boolean; const Config: string;
-  const PathEvaluator: IProjectPathEvaluator);
+  const PathEvaluator: IProjectPathEvaluator;
+  const AdditionalSourceRoots: TArray<string>);
 var
   ProjectText: string;
   MainMatch: TMatch;
@@ -109,6 +111,16 @@ begin
   ScanDirectory(FRoot, True);
   ReadSearchPaths(ProjectFile);
   if UseGlobalSearchPaths then ReadGlobalSearchPaths(FPlatform);
+  for var SourceRoot in AdditionalSourceRoots do
+  begin
+    var RootPath := TPath.GetFullPath(SourceRoot);
+    if not DirectoryExists(RootPath) then
+      raise Exception.Create('Source root not found: ' + RootPath);
+    if not FSearchDirectories.Contains(RootPath) then
+      FSearchDirectories.Add(RootPath);
+    ScanDirectory(RootPath, True);
+    FLogger.Write('INFO', 'source-root', RootPath);
+  end;
   ReadProgramReferences;
   FFiles.Add(FProgramFile);
   FLogger.Write('INFO', 'scope', Format('%d source files discovered', [FFiles.Count]));

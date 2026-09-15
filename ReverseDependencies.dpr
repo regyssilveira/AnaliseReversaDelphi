@@ -5,6 +5,7 @@ program ReverseDependencies;
 uses
   System.SysUtils,
   System.IOUtils,
+  System.Generics.Collections,
   Reverse.Domain in 'src\Reverse.Domain.pas',
   Reverse.AST in 'src\Reverse.AST.pas',
   Reverse.Graph in 'src\Reverse.Graph.pas',
@@ -23,6 +24,22 @@ begin
     if SameText(ParamStr(I), Option) then Exit(ParamStr(I + 1));
 end;
 
+function OptionValues(const Option: string): TArray<string>;
+var
+  Values: TList<string>;
+  I: Integer;
+begin
+  Values := TList<string>.Create;
+  try
+    for I := 1 to ParamCount - 1 do
+      if SameText(ParamStr(I), Option) then
+        Values.Add(ParamStr(I + 1));
+    Result := Values.ToArray;
+  finally
+    Values.Free;
+  end;
+end;
+
 var
   ProjectFile, Target, OutputDir: string;
   Logger: ILogger;
@@ -37,7 +54,7 @@ begin
     Target := OptionValue('--unit');
     if (ProjectFile = '') or (Target = '') then
     begin
-      Writeln('Usage: ReverseDependencies --project FILE.dproj --unit UnitName [--platform Win32|Win64] [--config Debug|Release] [--output DIR] [--no-global-path]');
+      Writeln('Usage: ReverseDependencies --project FILE.dproj --unit UnitName [--platform Win32|Win64] [--config Debug|Release] [--source-root DIR ...] [--output DIR] [--no-global-path]');
       ExitCode := 2;
       Exit;
     end;
@@ -53,7 +70,7 @@ begin
     Scope := TProjectScope.Create(ProjectFile, Logger,
       OptionValue('--platform'),
       UseGlobalSearchPaths, OptionValue('--config'),
-      TMSBuildPathEvaluator.Create(Logger));
+      TMSBuildPathEvaluator.Create(Logger), OptionValues('--source-root'));
     try
       Analyzer := TAnalyzer.Create(TAstUnitParser.Create(
         Scope.SearchDirectories.ToArray, Logger), Logger);

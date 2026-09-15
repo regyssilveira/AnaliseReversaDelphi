@@ -34,6 +34,12 @@ type
   end;
 
   [TestFixture]
+  TLogTests = class
+  public
+    [Test] procedure PersistsDebugAndWarningsAfterClose;
+  end;
+
+  [TestFixture]
   TWorkflowTests = class
   public
     [Test] procedure DiscoversTargetByNameAndWritesEvidence;
@@ -45,6 +51,7 @@ type
     [Test] procedure InfersDefaultPlatformFromProject;
     [Test] procedure EvaluatesOnlySelectedConfigurationPaths;
     [Test] procedure MarksMsbuildFailureAsPartial;
+    [Test] procedure FindsUnitRecursivelyInAdditionalSourceRoot;
   end;
 
 implementation
@@ -56,6 +63,22 @@ uses Reverse.AST, Reverse.Scope, Reverse.Analysis, Reverse.Output, Reverse.Log,
 procedure TGraphTests.Setup;
 begin
   FGraph := TReverseGraph.Create;
+end;
+
+procedure TLogTests.PersistsDebugAndWarningsAfterClose;
+var
+  FileName, Content: string;
+  Logger: ILogger;
+begin
+  TDirectory.CreateDirectory('bin\log-test');
+  FileName := TPath.GetFullPath('bin\log-test\analysis.log');
+  Logger := TFileLogger.Create(FileName);
+  Logger.Write('DEBUG', 'dependency', 'A uses B');
+  Logger.Write('WARN', 'unresolved-reference', 'B');
+  Logger := nil;
+  Content := TFile.ReadAllText(FileName);
+  Assert.IsTrue(Content.Contains('[DEBUG] dependency | A uses B'));
+  Assert.IsTrue(Content.Contains('[WARN] unresolved-reference | B'));
 end;
 
 procedure TGraphTests.TearDown;
@@ -510,9 +533,54 @@ begin
   end;
 end;
 
+procedure TWorkflowTests.FindsUnitRecursivelyInAdditionalSourceRoot;
+var
+  Root, ProjectRoot, LibraryRoot, ProjectFile: string;
+  Logger: ILogger;
+  Scope: TProjectScope;
+  Analyzer: TAnalyzer;
+  Analysis: TAnalysisResult;
+begin
+  Root := TPath.GetFullPath('bin\additional-root-test');
+  ProjectRoot := TPath.Combine(Root, 'Project');
+  LibraryRoot := TPath.Combine(Root, 'Library');
+  TDirectory.CreateDirectory(ProjectRoot);
+  TDirectory.CreateDirectory(TPath.Combine(LibraryRoot, 'Nested'));
+  TFile.WriteAllText(TPath.Combine(LibraryRoot, 'Nested\ExternalTarget.pas'),
+    'unit ExternalTarget; interface implementation end.');
+  TFile.WriteAllText(TPath.Combine(ProjectRoot, 'Consumer.pas'),
+    'unit Consumer; interface uses ExternalTarget; implementation end.');
+  TFile.WriteAllText(TPath.Combine(ProjectRoot, 'Additional.dpr'),
+    'program Additional; uses Consumer; begin end.');
+  ProjectFile := TPath.Combine(ProjectRoot, 'Additional.dproj');
+  TFile.WriteAllText(ProjectFile,
+    '<Project><PropertyGroup><MainSource>Additional.dpr</MainSource>' +
+    '</PropertyGroup></Project>');
+  Logger := TFileLogger.Create(TPath.Combine(Root, 'analysis.log'));
+  Scope := TProjectScope.Create(ProjectFile, Logger, 'Win64', False, '', nil,
+    [LibraryRoot]);
+  Analyzer := TAnalyzer.Create(TAstUnitParser.Create(
+    Scope.SearchDirectories.ToArray, Logger), Logger);
+  try
+    Analysis := Analyzer.Run(Scope, 'ExternalTarget');
+    try
+      Assert.AreEqual(NativeInt(3), Scope.Files.Count);
+      Assert.AreEqual(NativeInt(2), Length(Analysis.Reachable));
+      Assert.IsTrue(Analysis.Paths[0].Contains('[DPR]'));
+      Assert.AreEqual(0, Analysis.UnresolvedCount);
+    finally
+      Analysis.Free;
+    end;
+  finally
+    Analyzer.Free;
+    Scope.Free;
+  end;
+end;
+
 initialization
   TDUnitX.RegisterTestFixture(TGraphTests);
   TDUnitX.RegisterTestFixture(TAstTests);
+  TDUnitX.RegisterTestFixture(TLogTests);
   TDUnitX.RegisterTestFixture(TWorkflowTests);
 
 end.
