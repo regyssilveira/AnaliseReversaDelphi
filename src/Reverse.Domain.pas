@@ -32,6 +32,12 @@ type
     procedure Write(const Level, Event, Detail: string);
   end;
 
+  IProjectPathEvaluator = interface
+    ['{6A18A89C-454A-484E-8971-59E4B3C9927A}']
+    function Evaluate(const ProjectFile, Config, Platform,
+      PropertyName: string): TArray<string>;
+  end;
+
 function Key(const Name: string): string;
 
 implementation

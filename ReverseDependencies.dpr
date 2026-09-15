@@ -9,6 +9,7 @@ uses
   Reverse.AST in 'src\Reverse.AST.pas',
   Reverse.Graph in 'src\Reverse.Graph.pas',
   Reverse.Scope in 'src\Reverse.Scope.pas',
+  Reverse.MSBuild in 'src\Reverse.MSBuild.pas',
   Reverse.Log in 'src\Reverse.Log.pas',
   Reverse.Analysis in 'src\Reverse.Analysis.pas',
   Reverse.Output in 'src\Reverse.Output.pas';
@@ -36,7 +37,7 @@ begin
     Target := OptionValue('--unit');
     if (ProjectFile = '') or (Target = '') then
     begin
-      Writeln('Usage: ReverseDependencies --project FILE.dproj --unit UnitName [--platform Win32|Win64] [--output DIR] [--no-global-path]');
+      Writeln('Usage: ReverseDependencies --project FILE.dproj --unit UnitName [--platform Win32|Win64] [--config Debug|Release] [--output DIR] [--no-global-path]');
       ExitCode := 2;
       Exit;
     end;
@@ -51,7 +52,8 @@ begin
         UseGlobalSearchPaths := False;
     Scope := TProjectScope.Create(ProjectFile, Logger,
       OptionValue('--platform'),
-      UseGlobalSearchPaths);
+      UseGlobalSearchPaths, OptionValue('--config'),
+      TMSBuildPathEvaluator.Create(Logger));
     try
       Analyzer := TAnalyzer.Create(TAstUnitParser.Create(
         Scope.SearchDirectories.ToArray, Logger), Logger);
@@ -61,6 +63,7 @@ begin
           TOutputWriter.WriteFiles(Analysis, OutputDir);
           Writeln('Done: ' + OutputDir);
           if (Analysis.FallbackCount > 0) or (Analysis.FailedCount > 0) or
+            Analysis.PathEvaluationWasFallback or
             (Analysis.UnresolvedCount > 0) or
             (Analysis.AmbiguousCount > 0) then ExitCode := 3;
         finally

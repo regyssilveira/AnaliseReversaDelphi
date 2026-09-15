@@ -16,6 +16,9 @@ type
     FRoot: string;
     FProgramFile: string;
     FPlatform: string;
+    FConfig: string;
+    FPathEvaluator: IProjectPathEvaluator;
+    FPathEvaluationWasFallback: Boolean;
     procedure ScanDirectory(const Directory: string; Recursive: Boolean);
     procedure ReadSearchPaths(const ProjectFile: string);
     procedure ReadProgramReferences;
@@ -24,13 +27,16 @@ type
   public
     constructor Create(const ProjectFile: string; const Logger: ILogger;
       const Platform: string = '';
-      UseGlobalSearchPaths: Boolean = True);
+      UseGlobalSearchPaths: Boolean = True; const Config: string = '';
+      const PathEvaluator: IProjectPathEvaluator = nil);
     destructor Destroy; override;
     property Files: TList<string> read FFiles;
     property ProgramFile: string read FProgramFile;
     property SearchDirectories: TList<string> read FSearchDirectories;
     property NamespaceOrder: TList<string> read FNamespaceOrder;
     property Platform: string read FPlatform;
+    property Config: string read FConfig;
+    property PathEvaluationWasFallback: Boolean read FPathEvaluationWasFallback;
   end;
 
 implementation
@@ -39,7 +45,8 @@ uses System.SysUtils, System.IOUtils, System.Classes, System.RegularExpressions,
   System.Win.Registry, Winapi.Windows;
 
 constructor TProjectScope.Create(const ProjectFile: string; const Logger: ILogger;
-  const Platform: string; UseGlobalSearchPaths: Boolean);
+  const Platform: string; UseGlobalSearchPaths: Boolean; const Config: string;
+  const PathEvaluator: IProjectPathEvaluator);
 var
   ProjectText: string;
   MainMatch: TMatch;
@@ -48,6 +55,7 @@ begin
   if not FileExists(ProjectFile) then
     raise Exception.Create('Project not found: ' + ProjectFile);
   FLogger := Logger;
+  FPathEvaluator := PathEvaluator;
   FRoot := ExtractFilePath(ExpandFileName(ProjectFile));
   FProgramFile := ChangeFileExt(ExpandFileName(ProjectFile), '.dpr');
   ProjectText := TFile.ReadAllText(ProjectFile);
@@ -61,7 +69,16 @@ begin
   end;
   if not SameText(FPlatform, 'Win32') and not SameText(FPlatform, 'Win64') then
     raise Exception.Create('Unsupported platform: ' + FPlatform);
+  FConfig := Config;
+  if FConfig = '' then
+  begin
+    var ConfigMatch := TRegEx.Match(ProjectText,
+      '<Config[^>]*>(Debug|Release)</Config>', [roIgnoreCase]);
+    if ConfigMatch.Success then FConfig := ConfigMatch.Groups[1].Value
+    else FConfig := 'Debug';
+  end;
   FLogger.Write('INFO', 'platform', FPlatform);
+  FLogger.Write('INFO', 'config', FConfig);
   MainMatch := TRegEx.Match(ProjectText, '<MainSource>(.*?)</MainSource>',
     [roIgnoreCase, roSingleLine]);
   if MainMatch.Success then
@@ -150,34 +167,57 @@ procedure TProjectScope.ReadSearchPaths(const ProjectFile: string);
 var
   Text, Raw, Item, PathName, PathKind: string;
   Match: TMatch;
+  Evaluated: Boolean;
+  UnitPaths, IncludePaths: TArray<string>;
+  procedure AddPath(const Value, Kind: string);
+  begin
+    PathName := Trim(Value);
+    if PathName = '' then Exit;
+    if PathName.Contains('$(') then
+    begin
+      FLogger.Write('WARN', 'unresolved-macro', PathName);
+      Exit;
+    end;
+    if not TPath.IsPathRooted(PathName) then
+      PathName := TPath.GetFullPath(TPath.Combine(FRoot, PathName));
+    if DirectoryExists(PathName) then
+    begin
+      if not FSearchDirectories.Contains(PathName) then
+        FSearchDirectories.Add(PathName);
+      if SameText(Kind, 'UnitSearchPath') then
+        ScanDirectory(PathName, False);
+    end
+    else FLogger.Write('WARN', 'search-path-missing', PathName);
+  end;
 begin
   Text := TFile.ReadAllText(ProjectFile);
-  for Match in TRegEx.Matches(Text,
-    '<DCC_(UnitSearchPath|IncludePath)>(.*?)</DCC_\1>',
-    [roIgnoreCase, roSingleLine]) do
+  Evaluated := False;
+  if FPathEvaluator <> nil then
+    try
+      UnitPaths := FPathEvaluator.Evaluate(ProjectFile, FConfig, FPlatform,
+        'DCC_UnitSearchPath');
+      IncludePaths := FPathEvaluator.Evaluate(ProjectFile, FConfig, FPlatform,
+        'DCC_IncludePath');
+      for Raw in UnitPaths do
+        for Item in Raw.Split([';']) do AddPath(Item, 'UnitSearchPath');
+      for Raw in IncludePaths do
+        for Item in Raw.Split([';']) do AddPath(Item, 'IncludePath');
+      Evaluated := True;
+    except
+      on E: Exception do
+        FLogger.Write('WARN', 'msbuild-fallback', E.Message);
+    end;
+  if not Evaluated then
+  begin
+    FPathEvaluationWasFallback := FPathEvaluator <> nil;
+    for Match in TRegEx.Matches(Text,
+      '<DCC_(UnitSearchPath|IncludePath)>(.*?)</DCC_\1>',
+      [roIgnoreCase, roSingleLine]) do
   begin
     PathKind := Match.Groups[1].Value;
     Raw := Match.Groups[2].Value.Replace('&amp;', '&');
-    for Item in Raw.Split([';']) do
-    begin
-      PathName := Trim(Item);
-      if PathName = '' then Continue;
-      if PathName.Contains('$(') then
-      begin
-        FLogger.Write('WARN', 'unresolved-macro', PathName);
-        Continue;
-      end;
-      if not TPath.IsPathRooted(PathName) then
-        PathName := TPath.GetFullPath(TPath.Combine(FRoot, PathName));
-      if DirectoryExists(PathName) then
-      begin
-        if not FSearchDirectories.Contains(PathName) then
-          FSearchDirectories.Add(PathName);
-        if SameText(PathKind, 'UnitSearchPath') then
-          ScanDirectory(PathName, False);
-      end
-      else FLogger.Write('WARN', 'search-path-missing', PathName);
-    end;
+    for Item in Raw.Split([';']) do AddPath(Item, PathKind);
+  end;
   end;
   for Match in TRegEx.Matches(Text, '<DCCReference\s+Include="(.*?)"',
     [roIgnoreCase, roSingleLine]) do

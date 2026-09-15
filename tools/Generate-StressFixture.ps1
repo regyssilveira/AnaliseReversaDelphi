@@ -24,6 +24,6 @@ for ($i = 1; $i -le $UnitCount; $i++) {
 $lastUnit = 'U{0:D4}' -f $UnitCount
 Set-Content -LiteralPath (Join-Path $projectRoot 'Stress.dpr') -Value "program Stress;`r`nuses $lastUnit;`r`nbegin`r`nend." -Encoding ascii
 $searchPath = [Security.SecurityElement]::Escape(($libraryRoots -join ';'))
-$projectXml = "<Project><PropertyGroup><MainSource>Stress.dpr</MainSource><DCC_UnitSearchPath>$searchPath</DCC_UnitSearchPath></PropertyGroup></Project>"
+$projectXml = "<Project xmlns=`"http://schemas.microsoft.com/developer/msbuild/2003`"><PropertyGroup><MainSource>Stress.dpr</MainSource><DCC_UnitSearchPath>$searchPath</DCC_UnitSearchPath></PropertyGroup></Project>"
 Set-Content -LiteralPath (Join-Path $projectRoot 'Stress.dproj') -Value $projectXml -Encoding ascii
 Write-Output (Join-Path $projectRoot 'Stress.dproj')

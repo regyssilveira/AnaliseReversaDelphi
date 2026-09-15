@@ -36,6 +36,8 @@ begin
     Report.Add(Format('Parsed: %d | AST fallback: %d | Failed: %d | Unresolved: %d | Ambiguous: %d | Reachable edges: %d',
       [Result.ParsedCount, Result.FallbackCount, Result.FailedCount, Result.UnresolvedCount,
        Result.AmbiguousCount, Length(Result.Reachable)]));
+    if Result.PathEvaluationWasFallback then
+      Report.Add('Project path evaluation: MSBuild fallback; verify configuration-specific paths in analysis.log');
     Report.Add('');
     Report.Add('Reverse paths:');
     for Path in Result.Paths do Report.Add(Path);

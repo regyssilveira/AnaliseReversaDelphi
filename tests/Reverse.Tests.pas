@@ -43,11 +43,14 @@ type
     [Test] procedure UsesRelativeLibrarySearchPath;
     [Test] procedure ResolvesLegacyNameToNamespacedUnit;
     [Test] procedure InfersDefaultPlatformFromProject;
+    [Test] procedure EvaluatesOnlySelectedConfigurationPaths;
+    [Test] procedure MarksMsbuildFailureAsPartial;
   end;
 
 implementation
 
 uses Reverse.AST, Reverse.Scope, Reverse.Analysis, Reverse.Output, Reverse.Log,
+  Reverse.MSBuild,
   System.SysUtils, System.IOUtils, SimpleParser.Lexer.Types;
 
 procedure TGraphTests.Setup;
@@ -442,6 +445,66 @@ begin
     'tests\fixtures\Small\Small.dproj'), Logger, '', False);
   try
     Assert.AreEqual('Win32', Scope.Platform);
+  finally
+    Scope.Free;
+  end;
+end;
+
+procedure TWorkflowTests.EvaluatesOnlySelectedConfigurationPaths;
+var
+  Root, ProjectFile: string;
+  Logger: ILogger;
+  Scope: TProjectScope;
+begin
+  Root := TPath.GetFullPath('bin\msbuild-config-test');
+  TDirectory.CreateDirectory(Root);
+  TDirectory.CreateDirectory(TPath.Combine(Root, 'Debug64'));
+  TDirectory.CreateDirectory(TPath.Combine(Root, 'Release32'));
+  ProjectFile := TPath.Combine(Root, 'Config.dproj');
+  TFile.WriteAllText(TPath.Combine(Root, 'Config.dpr'),
+    'program Config; begin end.');
+  TFile.WriteAllText(ProjectFile,
+    '<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">' +
+    '<PropertyGroup><MainSource>Config.dpr</MainSource></PropertyGroup>' +
+    '<PropertyGroup Condition="''$(Config)''==''Debug'' And ''$(Platform)''==''Win64''">' +
+    '<DCC_UnitSearchPath>Debug64</DCC_UnitSearchPath></PropertyGroup>' +
+    '<PropertyGroup Condition="''$(Config)''==''Release'' And ''$(Platform)''==''Win32''">' +
+    '<DCC_UnitSearchPath>Release32</DCC_UnitSearchPath></PropertyGroup>' +
+    '</Project>');
+  Logger := TFileLogger.Create(TPath.Combine(Root, 'analysis.log'));
+  Scope := TProjectScope.Create(ProjectFile, Logger, 'Win64', False, 'Debug',
+    TMSBuildPathEvaluator.Create(Logger));
+  try
+    Assert.AreEqual('Debug', Scope.Config);
+    Assert.IsTrue(Scope.SearchDirectories.Contains(TPath.Combine(Root,
+      'Debug64')));
+    Assert.IsFalse(Scope.SearchDirectories.Contains(TPath.Combine(Root,
+      'Release32')));
+  finally
+    Scope.Free;
+  end;
+end;
+
+procedure TWorkflowTests.MarksMsbuildFailureAsPartial;
+var
+  Root, ProjectFile: string;
+  Logger: ILogger;
+  Scope: TProjectScope;
+begin
+  Root := TPath.GetFullPath('bin\msbuild-fallback-test');
+  TDirectory.CreateDirectory(Root);
+  ProjectFile := TPath.Combine(Root, 'Fallback.dproj');
+  TFile.WriteAllText(TPath.Combine(Root, 'Fallback.dpr'),
+    'program Fallback; begin end.');
+  TFile.WriteAllText(ProjectFile,
+    '<Project><PropertyGroup><MainSource>Fallback.dpr</MainSource>' +
+    '<DCC_UnitSearchPath>.</DCC_UnitSearchPath></PropertyGroup></Project>');
+  Logger := TFileLogger.Create(TPath.Combine(Root, 'analysis.log'));
+  Scope := TProjectScope.Create(ProjectFile, Logger, 'Win64', False, 'Debug',
+    TMSBuildPathEvaluator.Create(Logger));
+  try
+    Assert.IsTrue(Scope.PathEvaluationWasFallback);
+    Assert.IsTrue(Scope.SearchDirectories.Contains(Root));
   finally
     Scope.Free;
   end;

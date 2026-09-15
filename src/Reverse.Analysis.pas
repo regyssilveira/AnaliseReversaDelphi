@@ -17,6 +17,7 @@ type
     ParsedCount: Integer;
     FailedCount: Integer;
     FallbackCount: Integer;
+    PathEvaluationWasFallback: Boolean;
     UnresolvedCount: Integer;
     AmbiguousCount: Integer;
     constructor Create;
@@ -73,6 +74,7 @@ var
 begin
   Stopwatch := TStopwatch.StartNew;
   Result := TAnalysisResult.Create;
+  Result.PathEvaluationWasFallback := Scope.PathEvaluationWasFallback;
   Edges := TList<TDependency>.Create;
   Pending := TList<TDependency>.Create;
   Known := TObjectDictionary<string, TList<string>>.Create([doOwnsValues]);
