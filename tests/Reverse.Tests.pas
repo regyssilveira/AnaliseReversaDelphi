@@ -22,6 +22,7 @@ type
     [Test] procedure KeepsAllEdgesAfterRevisitingNode;
     [Test] procedure LimitsPathEnumerationWithoutDroppingGraphEdges;
     [Test] procedure KeepsSameNamedFilesSeparateWhenPathsAreKnown;
+    [Test] procedure SkipsIdenticalEdgesButKeepsDifferentEvidence;
   end;
 
   [TestFixture]
@@ -46,6 +47,7 @@ type
   TWorkflowTests = class
   public
     [Test] procedure DiscoversTargetByNameAndWritesEvidence;
+    [Test] procedure WritesEachIdenticalOutputLineOnlyOnce;
     [Test] procedure ReportsProgressForParsingAndResolution;
     [Test] procedure ReportsMissingTarget;
     [Test] procedure UsesMainSourceDeclaredByProject;
@@ -64,7 +66,7 @@ implementation
 uses Reverse.AST, Reverse.Scope, Reverse.Analysis, Reverse.Output, Reverse.Log,
   Reverse.Progress,
   Reverse.MSBuild,
-  System.SysUtils, System.IOUtils, SimpleParser.Lexer.Types;
+  System.SysUtils, System.IOUtils, System.Classes, SimpleParser.Lexer.Types;
 
 type
   TFixedPathProvider = class(TInterfacedObject, IGlobalSourcePathProvider)
@@ -205,6 +207,24 @@ begin
   AddEdge('A', 'C');
   AddEdge('B', 'C');
   Assert.AreEqual(NativeInt(4), Length(FGraph.Reachable('Target')));
+end;
+
+procedure TGraphTests.SkipsIdenticalEdgesButKeepsDifferentEvidence;
+var
+  Edge: TDependency;
+begin
+  Edge := Default(TDependency);
+  Edge.UsedName := 'Target';
+  Edge.Consumer := 'A';
+  Edge.SourceFile := 'A.pas';
+  Edge.Section := 'interface';
+  Edge.Line := 3;
+  FGraph.Add(Edge);
+  FGraph.Add(Edge);
+  Assert.AreEqual(NativeInt(1), Length(FGraph.Reachable('Target')));
+  Edge.Line := 4;
+  FGraph.Add(Edge);
+  Assert.AreEqual(NativeInt(2), Length(FGraph.Reachable('Target')));
 end;
 
 procedure TGraphTests.LimitsPathEnumerationWithoutDroppingGraphEdges;
@@ -404,6 +424,68 @@ begin
   finally
     Analyzer.Free;
     Scope.Free;
+  end;
+end;
+
+procedure TWorkflowTests.WritesEachIdenticalOutputLineOnlyOnce;
+var
+  Analysis: TAnalysisResult;
+  Edge: TDependency;
+  Dot, Report, Html: TStringList;
+  I, NodeCount, LinkCount, PathCount, EvidenceCount: Integer;
+  OutputDir: string;
+begin
+  Analysis := TAnalysisResult.Create;
+  Dot := TStringList.Create;
+  Report := TStringList.Create;
+  Html := TStringList.Create;
+  try
+    Analysis.TargetName := 'Target';
+    Analysis.TargetFile := 'Target.pas';
+    Analysis.ProgramName := 'App';
+    Analysis.ProgramFile := 'App.dpr';
+    Analysis.Paths := ['Target -> A -> App [DPR]',
+      'Target -> A -> App [DPR]'];
+    Edge := Default(TDependency);
+    Edge.UsedName := 'Target';
+    Edge.UsedPath := 'Target.pas';
+    Edge.Consumer := 'A';
+    Edge.ConsumerPath := 'A.pas';
+    Edge.SourceFile := 'A.pas';
+    Edge.Section := 'interface';
+    Edge.Line := 3;
+    Analysis.Reachable := [Edge, Edge];
+    OutputDir := TPath.GetFullPath('bin\dedup-output-test');
+    TOutputWriter.WriteFiles(Analysis, OutputDir);
+    Dot.LoadFromFile(TPath.Combine(OutputDir, 'graph.dot'));
+    Report.LoadFromFile(TPath.Combine(OutputDir, 'result.txt'));
+    Html.LoadFromFile(TPath.Combine(OutputDir, 'graph.html'));
+    NodeCount := 0;
+    LinkCount := 0;
+    PathCount := 0;
+    EvidenceCount := 0;
+    for I := 0 to Dot.Count - 1 do
+    begin
+      if Dot[I] = '  "Target.pas" [label="Target"];' then Inc(NodeCount);
+      if Dot[I] = '  "Target.pas" -> "A.pas" [label="interface:3"];' then
+        Inc(LinkCount);
+    end;
+    for I := 0 to Report.Count - 1 do
+    begin
+      if Report[I] = 'Target -> A -> App [DPR]' then Inc(PathCount);
+      if Report[I].StartsWith('Target -> A | interface |') then
+        Inc(EvidenceCount);
+    end;
+    Assert.AreEqual(1, NodeCount);
+    Assert.AreEqual(1, LinkCount);
+    Assert.AreEqual(1, PathCount);
+    Assert.AreEqual(1, EvidenceCount);
+    Assert.AreEqual(Html.Text.IndexOf('{from:'), Html.Text.LastIndexOf('{from:'));
+  finally
+    Html.Free;
+    Report.Free;
+    Dot.Free;
+    Analysis.Free;
   end;
 end;
 

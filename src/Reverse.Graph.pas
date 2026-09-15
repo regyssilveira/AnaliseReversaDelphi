@@ -11,6 +11,7 @@ type
   private
     FByUsed: TObjectDictionary<string, TList<TDependency>>;
     FNames: TDictionary<string, string>;
+    FSeenEdges: TDictionary<string, Boolean>;
     function GetConsumers(const Used: string): TList<TDependency>;
     function NodeText(const Node: string): string;
     function PathText(const Nodes: TList<string>): string;
@@ -33,11 +34,13 @@ begin
   inherited;
   FByUsed := TObjectDictionary<string, TList<TDependency>>.Create([doOwnsValues]);
   FNames := TDictionary<string, string>.Create;
+  FSeenEdges := TDictionary<string, Boolean>.Create;
 end;
 
 destructor TReverseGraph.Destroy;
 begin
   FNames.Free;
+  FSeenEdges.Free;
   FByUsed.Free;
   inherited;
 end;
@@ -67,8 +70,11 @@ end;
 procedure TReverseGraph.Add(const Edge: TDependency);
 var
   List: TList<TDependency>;
-  UsedKey, ConsumerKey: string;
+  UsedKey, ConsumerKey, Identity: string;
 begin
+  Identity := DependencyIdentity(Edge);
+  if FSeenEdges.ContainsKey(Identity) then Exit;
+  FSeenEdges.Add(Identity, True);
   if Edge.UsedPath <> '' then
   begin
     UsedKey := Key(Edge.UsedPath);

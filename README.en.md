@@ -28,6 +28,8 @@ The build script uses the local installation at `C:\Program Files (x86)\Embarcad
 
 The executable for local testing is `bin\Win64\UnitBacktrace.exe`. Each analysis writes `result.txt`, `graph.dot`, `graph.html`, and `analysis.log` to the directory selected by `--output`. Open `graph.html` in a browser to search nodes, show only paths reaching the DPR, and inspect the source file and line of each `uses` edge. The header indicates partial analysis. The HTML is self-contained and needs no installed graph renderer.
 
+Output generation removes exactly identical path and evidence lines, as well as duplicate DOT node and edge declarations. Dependencies with different files, sections, or source lines remain distinct. A large project can still have thousands of distinct reverse paths; the text listing is capped at 10,000 paths while the graph keeps reachable links.
+
 The console reports source discovery, parsing, dependency resolution, graph traversal, and output writing. Counts and percentages use the known total for each stage; graph traversal remains an in-progress stage until it finishes. Updates are throttled to one every 500 ms per stage, plus stage start and completion.
 
 ## Logs and exit codes

@@ -30,6 +30,8 @@ O script usa a instalação local `C:\Program Files (x86)\Embarcadero\Studio\37.
 
 O executável para testes locais fica em `bin\Win64\UnitBacktrace.exe`. A análise gera `result.txt`, `graph.dot`, `graph.html` e `analysis.log` na pasta indicada por `--output`. Abra `graph.html` no navegador para explorar o grafo sem instalar dependências. O painel permite buscar uma unit ou arquivo, destacar caminhos que chegam ao DPR e selecionar uma ligação para ver o arquivo e a linha do `uses`. O cabeçalho indica quando a análise é parcial.
 
+A saída elimina linhas exatamente iguais de caminhos e evidências, além de declarações de nós e ligações repetidas no DOT. Relações com arquivo, seção ou linha diferentes continuam separadas. Projetos com muitos ramos podem produzir milhares de caminhos distintos mesmo após essa limpeza; a lista textual mantém o limite de 10.000 caminhos, enquanto o grafo conserva as ligações alcançáveis.
+
 Durante a execução, o console informa a descoberta de arquivos, a análise dos fontes e a resolução das dependências. As contagens e porcentagens usam o total conhecido de cada etapa; a montagem do grafo aparece como etapa em andamento até terminar. As mensagens são limitadas a uma atualização a cada 500 ms por etapa, além do início e do fim. Exemplo:
 
 ```text

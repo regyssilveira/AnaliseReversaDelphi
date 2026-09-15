@@ -16,6 +16,7 @@ type
 implementation
 
 uses System.SysUtils, System.Classes, System.IOUtils, System.JSON,
+  System.Generics.Collections,
   Reverse.Domain;
 
 function SafeJson(const Value: string): string;
@@ -37,8 +38,10 @@ var
   Html: TStringList;
   Edge: TDependency;
   First: Boolean;
+  SeenEdges: TDictionary<string, Boolean>;
 begin
   Html := TStringList.Create;
+  SeenEdges := TDictionary<string, Boolean>.Create;
   try
     Html.Add('<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">');
     Html.Add('<meta name="viewport" content="width=device-width,initial-scale=1">');
@@ -80,6 +83,8 @@ begin
     First := True;
     for Edge in Analysis.Reachable do
     begin
+      if SeenEdges.ContainsKey(DependencyIdentity(Edge)) then Continue;
+      SeenEdges.Add(DependencyIdentity(Edge), True);
       if not First then Html.Add(',');
       First := False;
       Html.Add('{from:' + SafeJson(Edge.UsedPath) + ',to:' +
@@ -116,6 +121,7 @@ begin
     Html.Add('</script></body></html>');
     TFile.WriteAllText(FileName, Html.Text, TEncoding.UTF8);
   finally
+    SeenEdges.Free;
     Html.Free;
   end;
 end;

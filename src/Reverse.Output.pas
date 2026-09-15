@@ -15,7 +15,8 @@ type
 
 implementation
 
-uses System.SysUtils, System.IOUtils, System.Classes, Reverse.Domain,
+uses System.SysUtils, System.IOUtils, System.Classes,
+  System.Generics.Collections, Reverse.Domain,
   Reverse.Visual;
 
 function DotQuote(const Value: string): string;
@@ -29,10 +30,15 @@ var
   Report, Dot: TStringList;
   Edge: TDependency;
   Path: string;
+  SeenPaths, SeenEvidence, SeenDot: TDictionary<string, Boolean>;
+  Evidence, DotLine: string;
 begin
   TDirectory.CreateDirectory(OutputDirectory);
   Report := TStringList.Create;
   Dot := TStringList.Create;
+  SeenPaths := TDictionary<string, Boolean>.Create;
+  SeenEvidence := TDictionary<string, Boolean>.Create;
+  SeenDot := TDictionary<string, Boolean>.Create;
   try
     Report.Add('Target: ' + Result.TargetName + ' | ' + Result.TargetFile);
     Report.Add('Project entry: ' + Result.ProgramName);
@@ -43,22 +49,48 @@ begin
       Report.Add('Project path evaluation: MSBuild fallback; verify configuration-specific paths in analysis.log');
     Report.Add('');
     Report.Add('Reverse paths:');
-    for Path in Result.Paths do Report.Add(Path);
+    for Path in Result.Paths do
+      if not SeenPaths.ContainsKey(Path) then
+      begin
+        SeenPaths.Add(Path, True);
+        Report.Add(Path);
+      end;
     Report.Add('');
     Report.Add('Evidence:');
     Dot.Add('digraph UnitBacktrace {');
     Dot.Add('  rankdir=LR;');
     for Edge in Result.Reachable do
     begin
-      Report.Add(Edge.UsedName + ' -> ' + Edge.Consumer + ' | ' +
+      Evidence := Edge.UsedName + ' -> ' + Edge.Consumer + ' | ' +
         Edge.Section + ' | ' + Edge.SourceFile + ':' + Edge.Line.ToString +
-        ' | used file: ' + Edge.UsedPath);
-      Dot.Add('  ' + DotQuote(Edge.UsedPath) + ' [label=' +
-        DotQuote(Edge.UsedName) + '];');
-      Dot.Add('  ' + DotQuote(Edge.ConsumerPath) + ' [label=' +
-        DotQuote(Edge.Consumer) + '];');
-      Dot.Add('  ' + DotQuote(Edge.UsedPath) + ' -> ' + DotQuote(Edge.ConsumerPath) +
-        ' [label=' + DotQuote(Edge.Section + ':' + Edge.Line.ToString) + '];');
+        ' | used file: ' + Edge.UsedPath;
+      if not SeenEvidence.ContainsKey(Evidence) then
+      begin
+        SeenEvidence.Add(Evidence, True);
+        Report.Add(Evidence);
+      end;
+      DotLine := '  ' + DotQuote(Edge.UsedPath) + ' [label=' +
+        DotQuote(Edge.UsedName) + '];';
+      if not SeenDot.ContainsKey(DotLine) then
+      begin
+        SeenDot.Add(DotLine, True);
+        Dot.Add(DotLine);
+      end;
+      DotLine := '  ' + DotQuote(Edge.ConsumerPath) + ' [label=' +
+        DotQuote(Edge.Consumer) + '];';
+      if not SeenDot.ContainsKey(DotLine) then
+      begin
+        SeenDot.Add(DotLine, True);
+        Dot.Add(DotLine);
+      end;
+      DotLine := '  ' + DotQuote(Edge.UsedPath) + ' -> ' +
+        DotQuote(Edge.ConsumerPath) + ' [label=' +
+        DotQuote(Edge.Section + ':' + Edge.Line.ToString) + '];';
+      if not SeenDot.ContainsKey(DotLine) then
+      begin
+        SeenDot.Add(DotLine, True);
+        Dot.Add(DotLine);
+      end;
     end;
     Dot.Add('}');
     Report.SaveToFile(TPath.Combine(OutputDirectory, 'result.txt'), TEncoding.UTF8);
@@ -66,6 +98,9 @@ begin
     TVisualWriter.WriteHtml(Result,
       TPath.Combine(OutputDirectory, 'graph.html'));
   finally
+    SeenDot.Free;
+    SeenEvidence.Free;
+    SeenPaths.Free;
     Dot.Free;
     Report.Free;
   end;

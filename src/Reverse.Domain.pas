@@ -51,6 +51,7 @@ type
   end;
 
 function Key(const Name: string): string;
+function DependencyIdentity(const Edge: TDependency): string;
 
 implementation
 
@@ -61,6 +62,14 @@ begin
     (ExtractFileDrive(Result) <> '') then Exit;
   if SameText(ExtractFileExt(Result), '.pas') then
     Result := ChangeFileExt(Result, '');
+end;
+
+function DependencyIdentity(const Edge: TDependency): string;
+begin
+  Result := Edge.UsedName + #0 + Edge.UsedPath + #0 +
+    Edge.Consumer + #0 + Edge.ConsumerPath + #0 +
+    Edge.DeclaredPath + #0 + Edge.SourceFile + #0 +
+    Edge.Section + #0 + Edge.Line.ToString;
 end;
 
 end.
