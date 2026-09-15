@@ -28,6 +28,8 @@ The build script uses the local installation at `C:\Program Files (x86)\Embarcad
 
 The executable for local testing is `bin\Win64\UnitBacktrace.exe`. Each analysis writes `result.txt`, `graph.dot`, and `analysis.log` to the directory selected by `--output`.
 
+The console reports source discovery, parsing, dependency resolution, graph traversal, and output writing. Counts and percentages use the known total for each stage; graph traversal remains an in-progress stage until it finishes. Updates are throttled to one every 500 ms per stage, plus stage start and completion.
+
 ## Logs and exit codes
 
 The UTF-8 log records `INFO`, `WARN`, `ERROR`, and `DEBUG`: target candidates, each dependency, the file selected for each reference, parser or MSBuild fallbacks, failures, and unresolved search paths. Exit code `0` means no fallbacks, failed files, unresolved or ambiguous references; `1` is a fatal error; `2` means required arguments are missing; `3` means a partial result was written. Unresolved relationships remain in the log and are excluded from the graph.

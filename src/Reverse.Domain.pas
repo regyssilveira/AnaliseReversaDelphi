@@ -34,6 +34,11 @@ type
     procedure Write(const Level, Event, Detail: string);
   end;
 
+  IAnalysisProgress = interface
+    ['{209E72D8-5722-4C91-A52E-778512A86612}']
+    procedure Report(const Stage: string; Completed, Total: Integer);
+  end;
+
   IProjectPathEvaluator = interface
     ['{6A18A89C-454A-484E-8971-59E4B3C9927A}']
     function Evaluate(const ProjectFile, Config, Platform,

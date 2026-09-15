@@ -30,8 +30,10 @@ type
   private
     FParser: IUnitParser;
     FLogger: ILogger;
+    FProgress: IAnalysisProgress;
   public
-    constructor Create(const Parser: IUnitParser; const Logger: ILogger);
+    constructor Create(const Parser: IUnitParser; const Logger: ILogger;
+      const Progress: IAnalysisProgress = nil);
     function Run(const Scope: TProjectScope; const Target: string): TAnalysisResult;
   end;
 
@@ -51,11 +53,13 @@ begin
   inherited;
 end;
 
-constructor TAnalyzer.Create(const Parser: IUnitParser; const Logger: ILogger);
+constructor TAnalyzer.Create(const Parser: IUnitParser; const Logger: ILogger;
+  const Progress: IAnalysisProgress);
 begin
   inherited Create;
   FParser := Parser;
   FLogger := Logger;
+  FProgress := Progress;
 end;
 
 function TAnalyzer.Run(const Scope: TProjectScope; const Target: string): TAnalysisResult;
@@ -64,6 +68,7 @@ var
   Edges, Pending: TList<TDependency>;
   Edge: TDependency;
   Count: Integer;
+  Processed: Integer;
   Known: TObjectDictionary<string, TList<string>>;
   Aliases: TObjectDictionary<string, TList<string>>;
   Candidates: TList<string>;
@@ -84,6 +89,8 @@ begin
   try
     try
     Count := 0;
+    Processed := 0;
+    if FProgress <> nil then FProgress.Report('Analisando arquivos', 0, Scope.Files.Count);
     for FileName in Scope.Files do
     begin
       Edges.Clear;
@@ -130,13 +137,19 @@ begin
           FLogger.Write('WARN', 'parse-failed', FileName + ' | ' + E.Message);
         end;
       end;
+      Inc(Processed);
+      if FProgress <> nil then
+        FProgress.Report('Analisando arquivos', Processed, Scope.Files.Count);
     end;
     if Count = 0 then raise Exception.Create('Unit not found: ' + Target);
     if Count > 1 then raise Exception.Create('Ambiguous unit: ' + Target +
       ' (' + Count.ToString + ' candidates; see log)');
+    if FProgress <> nil then FProgress.Report('Resolvendo dependencias', 0, Pending.Count);
     for I := 0 to Pending.Count - 1 do
     begin
       Edge := Pending[I];
+      if FProgress <> nil then
+        FProgress.Report('Resolvendo dependencias', I, Pending.Count);
       if Edge.DeclaredPath <> '' then
       begin
         DeclaredFile := Edge.DeclaredPath;
@@ -218,8 +231,11 @@ begin
       FLogger.Write('DEBUG', 'resolved-reference', Edge.UsedName + ' | ' +
         Edge.UsedPath + ' -> ' + Edge.ConsumerPath);
     end;
+    if FProgress <> nil then FProgress.Report('Resolvendo dependencias', Pending.Count, Pending.Count);
+    if FProgress <> nil then FProgress.Report('Montando grafo reverso', 0, 0);
     Result.Reachable := Result.Graph.Reachable(Result.TargetFile);
     Result.Paths := Result.Graph.Paths(Result.TargetFile, Scope.ProgramFile);
+    if FProgress <> nil then FProgress.Report('Montando grafo reverso', 1, 1);
     FLogger.Write('INFO', 'complete', Format('%d parsed; %d fallback; %d failed; %d unresolved; %d ambiguous; %d reachable edges; %d ms',
       [Result.ParsedCount, Result.FallbackCount, Result.FailedCount, Result.UnresolvedCount,
        Result.AmbiguousCount, Length(Result.Reachable), Stopwatch.ElapsedMilliseconds]));

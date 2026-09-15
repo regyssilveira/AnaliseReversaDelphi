@@ -15,6 +15,7 @@ uses
   Reverse.MSBuild in 'src\Reverse.MSBuild.pas',
   Reverse.DelphiPaths in 'src\Reverse.DelphiPaths.pas',
   Reverse.Log in 'src\Reverse.Log.pas',
+  Reverse.Progress in 'src\Reverse.Progress.pas',
   Reverse.Analysis in 'src\Reverse.Analysis.pas',
   Reverse.Output in 'src\Reverse.Output.pas';
 
@@ -66,6 +67,7 @@ begin
     TDirectory.CreateDirectory(OutputDir);
     Logger := TFileLogger.Create(TPath.Combine(OutputDir, 'analysis.log'));
     Logger.Write('INFO', 'start', ProjectFile + ' | ' + Target);
+    Writeln('Preparando projeto e descobrindo arquivos...');
     UseGlobalSearchPaths := True;
     for I := 1 to ParamCount do
       if SameText(ParamStr(I), '--no-global-path') then
@@ -75,11 +77,14 @@ begin
       UseGlobalSearchPaths, OptionValue('--config'),
       TMSBuildPathEvaluator.Create(Logger), OptionValues('--source-root'));
     try
+      Writeln(Format('Arquivos descobertos: %d | %s | %s',
+        [Scope.Files.Count, Scope.Platform, Scope.Config]));
       Analyzer := TAnalyzer.Create(TAstUnitParser.Create(
-        Scope.SearchDirectories.ToArray, Logger), Logger);
+        Scope.SearchDirectories.ToArray, Logger), Logger, TConsoleProgress.Create);
       try
         Analysis := Analyzer.Run(Scope, Target);
         try
+          Writeln('Gravando resultado e log...');
           TOutputWriter.WriteFiles(Analysis, OutputDir);
           Writeln('Done: ' + OutputDir);
           if (Analysis.FallbackCount > 0) or (Analysis.FailedCount > 0) or

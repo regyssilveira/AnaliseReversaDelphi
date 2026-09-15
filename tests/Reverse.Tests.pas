@@ -39,12 +39,14 @@ type
   TLogTests = class
   public
     [Test] procedure PersistsDebugAndWarningsAfterClose;
+    [Test] procedure FormatsProgressWithKnownAndUnknownTotals;
   end;
 
   [TestFixture]
   TWorkflowTests = class
   public
     [Test] procedure DiscoversTargetByNameAndWritesEvidence;
+    [Test] procedure ReportsProgressForParsingAndResolution;
     [Test] procedure ReportsMissingTarget;
     [Test] procedure UsesMainSourceDeclaredByProject;
     [Test] procedure DiscoversExplicitDprReferenceOutsideProjectFolder;
@@ -60,6 +62,7 @@ type
 implementation
 
 uses Reverse.AST, Reverse.Scope, Reverse.Analysis, Reverse.Output, Reverse.Log,
+  Reverse.Progress,
   Reverse.MSBuild,
   System.SysUtils, System.IOUtils, SimpleParser.Lexer.Types;
 
@@ -71,6 +74,39 @@ type
     constructor Create(const Directory: string);
     function Paths(const Platform, ProjectRoot: string): TArray<string>;
   end;
+
+  TProgressRecorder = class(TInterfacedObject, IAnalysisProgress)
+  public
+    Stages: TList<string>;
+    CompletedValues: TList<Integer>;
+    Totals: TList<Integer>;
+    constructor Create;
+    destructor Destroy; override;
+    procedure Report(const Stage: string; Completed, Total: Integer);
+  end;
+
+constructor TProgressRecorder.Create;
+begin
+  inherited;
+  Stages := TList<string>.Create;
+  CompletedValues := TList<Integer>.Create;
+  Totals := TList<Integer>.Create;
+end;
+
+destructor TProgressRecorder.Destroy;
+begin
+  Totals.Free;
+  CompletedValues.Free;
+  Stages.Free;
+  inherited;
+end;
+
+procedure TProgressRecorder.Report(const Stage: string; Completed, Total: Integer);
+begin
+  Stages.Add(Stage);
+  CompletedValues.Add(Completed);
+  Totals.Add(Total);
+end;
 
 constructor TFixedPathProvider.Create(const Directory: string);
 begin
@@ -103,6 +139,14 @@ begin
   Content := TFile.ReadAllText(FileName);
   Assert.IsTrue(Content.Contains('[DEBUG] dependency | A uses B'));
   Assert.IsTrue(Content.Contains('[WARN] unresolved-reference | B'));
+end;
+
+procedure TLogTests.FormatsProgressWithKnownAndUnknownTotals;
+begin
+  Assert.AreEqual('Analisando arquivos: 5/20 (25%)',
+    TConsoleProgress.FormatLine('Analisando arquivos', 5, 20));
+  Assert.AreEqual('Montando grafo reverso...',
+    TConsoleProgress.FormatLine('Montando grafo reverso', 0, 0));
 end;
 
 procedure TGraphTests.TearDown;
@@ -350,6 +394,53 @@ begin
         .Contains('Target -> A | interface'));
       Assert.IsTrue(TFile.ReadAllText(TPath.Combine(OutputDir, 'graph.dot'))
         .Contains('[label="Target"]'));
+    finally
+      Analysis.Free;
+    end;
+  finally
+    Analyzer.Free;
+    Scope.Free;
+  end;
+end;
+
+procedure TWorkflowTests.ReportsProgressForParsingAndResolution;
+var
+  Logger: ILogger;
+  Scope: TProjectScope;
+  Analyzer: TAnalyzer;
+  Analysis: TAnalysisResult;
+  Progress: IAnalysisProgress;
+  Recorder: TProgressRecorder;
+  I: Integer;
+  FoundParsing, FoundResolution, FoundGraph: Boolean;
+begin
+  Logger := TFileLogger.Create(TPath.GetFullPath('bin\progress-test.log'));
+  Scope := TProjectScope.Create(TPath.GetFullPath(
+    'tests\fixtures\Small\Small.dproj'), Logger, 'Win64', False);
+  Recorder := TProgressRecorder.Create;
+  Progress := Recorder;
+  Analyzer := TAnalyzer.Create(TAstUnitParser.Create, Logger, Progress);
+  try
+    Analysis := Analyzer.Run(Scope, 'Target');
+    try
+      FoundParsing := False;
+      FoundResolution := False;
+      FoundGraph := False;
+      for I := 0 to Recorder.Stages.Count - 1 do
+      begin
+        Assert.IsTrue(Recorder.CompletedValues[I] <= Recorder.Totals[I]);
+        if (Recorder.Stages[I] = 'Analisando arquivos') and
+          (Recorder.CompletedValues[I] = Scope.Files.Count) then
+          FoundParsing := True;
+        if (Recorder.Stages[I] = 'Resolvendo dependencias') and
+          (Recorder.CompletedValues[I] = Recorder.Totals[I]) and
+          (Recorder.Totals[I] > 0) then FoundResolution := True;
+        if (Recorder.Stages[I] = 'Montando grafo reverso') and
+          (Recorder.CompletedValues[I] = 1) then FoundGraph := True;
+      end;
+      Assert.IsTrue(FoundParsing);
+      Assert.IsTrue(FoundResolution);
+      Assert.IsTrue(FoundGraph);
     finally
       Analysis.Free;
     end;

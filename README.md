@@ -30,6 +30,20 @@ O script usa a instalação local `C:\Program Files (x86)\Embarcadero\Studio\37.
 
 O executável para testes locais fica em `bin\Win64\UnitBacktrace.exe`. A análise gera `result.txt`, `graph.dot` e `analysis.log` na pasta indicada por `--output`.
 
+Durante a execução, o console informa a descoberta de arquivos, a análise dos fontes e a resolução das dependências. As contagens e porcentagens usam o total conhecido de cada etapa; a montagem do grafo aparece como etapa em andamento até terminar. As mensagens são limitadas a uma atualização a cada 500 ms por etapa, além do início e do fim. Exemplo:
+
+```text
+Preparando projeto e descobrindo arquivos...
+Arquivos descobertos: 4 | Win32 | Debug
+Analisando arquivos: 0/4 (0%)
+Analisando arquivos: 4/4 (100%)
+Resolvendo dependencias: 0/5 (0%)
+Resolvendo dependencias: 5/5 (100%)
+Montando grafo reverso...
+Gravando resultado e log...
+Done: D:\Analise
+```
+
 ## Log e códigos de saída
 
 O log UTF-8 registra `INFO`, `WARN`, `ERROR` e `DEBUG`, incluindo candidatos para a unit alvo, cada relação encontrada, o arquivo escolhido para cada referência, fallback do parser ou MSBuild, falhas e caminhos de busca sem resolução. Código `0`: análise concluída sem fallback, falhas, referências não resolvidas ou ambíguas; `1`: erro fatal; `2`: argumentos ausentes; `3`: resultado gerado com fallback, fontes ou referências sem resolução ou ambíguas. Relações não resolvidas ficam no log e não entram no grafo.
