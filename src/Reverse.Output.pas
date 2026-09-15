@@ -33,8 +33,9 @@ begin
   try
     Report.Add('Target: ' + Result.TargetName + ' | ' + Result.TargetFile);
     Report.Add('Project entry: ' + Result.ProgramName);
-    Report.Add(Format('Parsed: %d | Failed: %d | Reachable edges: %d',
-      [Result.ParsedCount, Result.FailedCount, Length(Result.Reachable)]));
+    Report.Add(Format('Parsed: %d | AST fallback: %d | Failed: %d | Unresolved: %d | Ambiguous: %d | Reachable edges: %d',
+      [Result.ParsedCount, Result.FallbackCount, Result.FailedCount, Result.UnresolvedCount,
+       Result.AmbiguousCount, Length(Result.Reachable)]));
     Report.Add('');
     Report.Add('Reverse paths:');
     for Path in Result.Paths do Report.Add(Path);
@@ -45,8 +46,13 @@ begin
     for Edge in Result.Reachable do
     begin
       Report.Add(Edge.UsedName + ' -> ' + Edge.Consumer + ' | ' +
-        Edge.Section + ' | ' + Edge.SourceFile + ':' + Edge.Line.ToString);
-      Dot.Add('  ' + DotQuote(Edge.UsedName) + ' -> ' + DotQuote(Edge.Consumer) +
+        Edge.Section + ' | ' + Edge.SourceFile + ':' + Edge.Line.ToString +
+        ' | used file: ' + Edge.UsedPath);
+      Dot.Add('  ' + DotQuote(Edge.UsedPath) + ' [label=' +
+        DotQuote(Edge.UsedName) + '];');
+      Dot.Add('  ' + DotQuote(Edge.ConsumerPath) + ' [label=' +
+        DotQuote(Edge.Consumer) + '];');
+      Dot.Add('  ' + DotQuote(Edge.UsedPath) + ' -> ' + DotQuote(Edge.ConsumerPath) +
         ' [label=' + DotQuote(Edge.Section + ':' + Edge.Line.ToString) + '];');
     end;
     Dot.Add('}');

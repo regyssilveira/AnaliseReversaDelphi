@@ -28,13 +28,15 @@ var
   Scope: TProjectScope;
   Analyzer: TAnalyzer;
   Analysis: TAnalysisResult;
+  I: Integer;
+  UseGlobalSearchPaths: Boolean;
 begin
   try
     ProjectFile := OptionValue('--project');
     Target := OptionValue('--unit');
     if (ProjectFile = '') or (Target = '') then
     begin
-      Writeln('Usage: ReverseDependencies --project FILE.dproj --unit UnitName [--output DIR]');
+      Writeln('Usage: ReverseDependencies --project FILE.dproj --unit UnitName [--platform Win32|Win64] [--output DIR] [--no-global-path]');
       ExitCode := 2;
       Exit;
     end;
@@ -43,15 +45,24 @@ begin
     TDirectory.CreateDirectory(OutputDir);
     Logger := TFileLogger.Create(TPath.Combine(OutputDir, 'analysis.log'));
     Logger.Write('INFO', 'start', ProjectFile + ' | ' + Target);
-    Scope := TProjectScope.Create(ProjectFile, Logger);
+    UseGlobalSearchPaths := True;
+    for I := 1 to ParamCount do
+      if SameText(ParamStr(I), '--no-global-path') then
+        UseGlobalSearchPaths := False;
+    Scope := TProjectScope.Create(ProjectFile, Logger,
+      OptionValue('--platform'),
+      UseGlobalSearchPaths);
     try
-      Analyzer := TAnalyzer.Create(TAstUnitParser.Create, Logger);
+      Analyzer := TAnalyzer.Create(TAstUnitParser.Create(
+        Scope.SearchDirectories.ToArray, Logger), Logger);
       try
         Analysis := Analyzer.Run(Scope, Target);
         try
           TOutputWriter.WriteFiles(Analysis, OutputDir);
           Writeln('Done: ' + OutputDir);
-          if Analysis.FailedCount > 0 then ExitCode := 3;
+          if (Analysis.FallbackCount > 0) or (Analysis.FailedCount > 0) or
+            (Analysis.UnresolvedCount > 0) or
+            (Analysis.AmbiguousCount > 0) then ExitCode := 3;
         finally
           Analysis.Free;
         end;

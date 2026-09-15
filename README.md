@@ -8,7 +8,9 @@ Ferramenta console para responder **quem usa uma unit Delphi e por quais caminho
 ReverseDependencies.exe --project "D:\MeuERP\MeuERP.dproj" --unit uExtrator --output "D:\Analise"
 ```
 
-O programa procura fontes recursivamente na pasta do projeto e nas pastas explícitas de `DCC_UnitSearchPath`. Inclui o DPR, lê `uses` em `interface` e `implementation` com [DelphiAST](https://github.com/RomanYankovsky/DelphiAST), e preserva todos os ramos do grafo. A enumeração textual é limitada a 10.000 caminhos para evitar explosão combinatória; o DOT conserva todas as ligações alcançáveis. Ciclos e ramos sem consumidores são identificados.
+O programa procura fontes recursivamente na pasta do projeto e nas pastas explícitas de `DCC_UnitSearchPath`. Em uma máquina com Delphi 13, também lê o Search Path e o Browsing Path registrados na IDE para localizar fontes de bibliotecas. A plataforma padrão vem do `.dproj` e pode ser alterada com `--platform Win32` ou `--platform Win64`. Para analisar somente os caminhos do projeto, use `--no-global-path`.
+
+Também encontra arquivos referenciados diretamente pelo DPR, usa `MainSource` quando o DPR tem outro nome e procura includes relativos e em `DCC_IncludePath`. Lê `uses` em `interface` e `implementation` com [DelphiAST](https://github.com/RomanYankovsky/DelphiAST), identifica cada arquivo pelo caminho resolvido e preserva os ramos do grafo. Quando o DelphiAST rejeita uma sintaxe, a ferramenta tenta extrair os `uses` por tokens, registra o fallback e marca o resultado como parcial. Nomes curtos como `Classes` são resolvidos usando a ordem de namespaces do projeto. A enumeração textual é limitada a 10.000 caminhos para evitar explosão combinatória; o DOT conserva todas as ligações alcançáveis. Ciclos e ramos sem consumidores são identificados.
 
 ### Compilar e testar no Delphi 13
 
@@ -24,11 +26,11 @@ O script usa a instalação local `C:\Program Files (x86)\Embarcadero\Studio\37.
 
 ### Log e códigos de saída
 
-O log UTF-8 registra `INFO`, `WARN`, `ERROR` e `DEBUG`, incluindo candidatos para a unit alvo, cada relação encontrada, falhas de parsing e caminhos de busca sem resolução. Código `0`: análise concluída sem falhas de parsing; `1`: erro fatal; `2`: argumentos ausentes; `3`: resultado gerado com algum arquivo que falhou no parsing.
+O log UTF-8 registra `INFO`, `WARN`, `ERROR` e `DEBUG`, incluindo candidatos para a unit alvo, cada relação encontrada, o arquivo escolhido para cada referência, fallback do parser, falhas e caminhos de busca sem resolução. Código `0`: análise concluída sem falhas ou referências sem resolução; `1`: erro fatal; `2`: argumentos ausentes; `3`: resultado gerado com fallback, fontes ou referências sem resolução ou ambíguas. Relações não resolvidas ficam no log e não entram no grafo.
 
 ### Alcance atual
 
-Esta versão analisa dependências declaradas em `uses`. Ela não verifica se um símbolo da unit é realmente chamado. A leitura de `DCC_UnitSearchPath` ainda não avalia todas as condições do MSBuild nem resolve macros `$(...)`; elas são sinalizadas no log. Um projeto grande com caminhos condicionais deve ser conferido antes de tratar o resultado como completo. Também faltam testes com um projeto Delphi real de terceiros; o teste de escala sintético possui 2.202 fontes, inclui três bibliotecas externas à pasta do DPR e completou sem falhas de parsing em cerca de 0,47 s no ambiente de desenvolvimento (Win64).
+Esta versão analisa dependências declaradas em `uses`. Ela não verifica se um símbolo da unit é realmente chamado. A leitura de `DCC_UnitSearchPath` ainda não avalia todas as condições do MSBuild; variáveis `$(...)` sem valor conhecido são sinalizadas no log. Um projeto com caminhos condicionais deve ser conferido antes de tratar o resultado como completo. O teste sintético reproduzível possui 2.202 fontes distribuídos entre o projeto e três bibliotecas externas. Os testes DUnitX cobrem parser, fallback, includes, resolução de arquivos e namespaces, grafo e saída console.
 
 ## English
 
@@ -38,9 +40,9 @@ Console tool answering **which Delphi units use a selected unit, and through whi
 ReverseDependencies.exe --project "D:\MyApp\MyApp.dproj" --unit uExtractor --output "D:\Analysis"
 ```
 
-It recursively scans the project directory and explicit `DCC_UnitSearchPath` directories, parses interface and implementation `uses` clauses with [DelphiAST](https://github.com/RomanYankovsky/DelphiAST), and preserves converging branches and cycles. Textual path enumeration stops at 10,000 paths to avoid combinatorial explosion; DOT retains every reachable edge. Build and test with the Delphi 13 commands above.
+It scans the project directory, explicit `DCC_UnitSearchPath` directories, and the Delphi 13 IDE's registered Search and Browsing Paths for library sources. The default platform comes from the `.dproj`; `--platform Win32|Win64` overrides it. `--no-global-path` limits the scope to project paths. It parses interface and implementation `uses` clauses with [DelphiAST](https://github.com/RomanYankovsky/DelphiAST), falls back to token extraction for unsupported syntax, and identifies nodes by resolved file path. Short unit names use the project's namespace order. Textual path enumeration stops at 10,000 paths to avoid combinatorial explosion; DOT retains every reachable edge. Build and test with the Delphi 13 commands above.
 
-The current scope is declared `uses` dependencies. MSBuild conditions and `$(...)` path macros are not fully evaluated yet and are logged for review. A synthetic 2,202-source project with three external libraries completed without parser errors in about 0.47 s on the development machine (Win64); validation against a large real project is still required.
+The current scope is declared `uses` dependencies. Unresolved and ambiguous references are logged and excluded from the graph. MSBuild conditions and unknown `$(...)` path macros are not fully evaluated yet and are logged for review. The reproducible synthetic fixture has 2,202 source files across a project and three external libraries. DUnitX tests cover parsing, fallback, includes, file and namespace resolution, graph traversal, and console output.
 
 ## License
 

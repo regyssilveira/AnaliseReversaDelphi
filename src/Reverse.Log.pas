@@ -8,6 +8,7 @@ type
   TFileLogger = class(TInterfacedObject, ILogger)
   private
     FWriter: TStreamWriter;
+    FPendingCount: Integer;
   public
     constructor Create(const FileName: string);
     destructor Destroy; override;
@@ -34,7 +35,12 @@ procedure TFileLogger.Write(const Level, Event, Detail: string);
 begin
   FWriter.WriteLine(FormatDateTime('yyyy-mm-dd"T"hh:nn:ss.zzz', Now) +
     ' [' + Level + '] ' + Event + ' | ' + Detail);
-  FWriter.Flush;
+  Inc(FPendingCount);
+  if (FPendingCount >= 200) or not SameText(Level, 'DEBUG') then
+  begin
+    FWriter.Flush;
+    FPendingCount := 0;
+  end;
 end;
 
 end.

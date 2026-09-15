@@ -1,0 +1,1 @@
+<Project><PropertyGroup><MainSource>SearchPaths.dpr</MainSource><DCC_UnitSearchPath>..\Library</DCC_UnitSearchPath></PropertyGroup></Project>

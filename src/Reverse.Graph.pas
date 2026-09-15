@@ -10,6 +10,8 @@ type
     FByUsed: TObjectDictionary<string, TList<TDependency>>;
     FNames: TDictionary<string, string>;
     function GetConsumers(const Used: string): TList<TDependency>;
+    function NodeText(const Node: string): string;
+    function PathText(const Nodes: TList<string>): string;
   public
     constructor Create;
     destructor Destroy; override;
@@ -43,12 +45,39 @@ begin
   if not FByUsed.TryGetValue(Key(Used), Result) then Result := nil;
 end;
 
+function TReverseGraph.NodeText(const Node: string): string;
+begin
+  if not FNames.TryGetValue(Key(Node), Result) then Result := Node;
+end;
+
+function TReverseGraph.PathText(const Nodes: TList<string>): string;
+var
+  Node: string;
+begin
+  Result := '';
+  for Node in Nodes do
+  begin
+    if Result <> '' then Result := Result + ' -> ';
+    Result := Result + NodeText(Node);
+  end;
+end;
+
 procedure TReverseGraph.Add(const Edge: TDependency);
 var
   List: TList<TDependency>;
-  UsedKey: string;
+  UsedKey, ConsumerKey: string;
 begin
-  UsedKey := Key(Edge.UsedName);
+  if Edge.UsedPath <> '' then
+  begin
+    UsedKey := Key(Edge.UsedPath);
+    if Edge.ConsumerPath <> '' then ConsumerKey := Key(Edge.ConsumerPath)
+    else ConsumerKey := Key(Edge.SourceFile);
+  end
+  else
+  begin
+    UsedKey := Key(Edge.UsedName);
+    ConsumerKey := Key(Edge.Consumer);
+  end;
   if not FByUsed.TryGetValue(UsedKey, List) then
   begin
     List := TList<TDependency>.Create;
@@ -56,6 +85,7 @@ begin
   end;
   List.Add(Edge);
   FNames.AddOrSetValue(UsedKey, Edge.UsedName);
+  FNames.AddOrSetValue(ConsumerKey, Edge.Consumer);
 end;
 
 function TReverseGraph.Reachable(const Target: string): TArray<TDependency>;
@@ -81,7 +111,12 @@ begin
       for Edge in Edges do
       begin
         Output.Add(Edge);
-        Next := Key(Edge.Consumer);
+        if Edge.UsedPath <> '' then
+        begin
+          if Edge.ConsumerPath <> '' then Next := Key(Edge.ConsumerPath)
+          else Next := Key(Edge.SourceFile);
+        end
+        else Next := Key(Edge.Consumer);
         if not Seen.ContainsKey(Next) then
         begin
           Seen.Add(Next, True);
@@ -128,7 +163,7 @@ begin
       Frame := Frames[Frames.Count - 1];
       if SameText(Frame.Name, ProgramName) then
       begin
-        Output.Add(String.Join(' -> ', Stack.ToArray) + ' [DPR]');
+        Output.Add(PathText(Stack) + ' [DPR]');
         Stopped := Output.Count >= MaxPaths;
         Frames.Delete(Frames.Count - 1);
         Stack.Delete(Stack.Count - 1);
@@ -137,7 +172,7 @@ begin
       Edges := GetConsumers(Frame.Name);
       if (Edges = nil) or (Edges.Count = 0) then
       begin
-        Output.Add(String.Join(' -> ', Stack.ToArray) + ' [NO CONSUMER]');
+        Output.Add(PathText(Stack) + ' [NO CONSUMER]');
         Stopped := Output.Count >= MaxPaths;
         Frames.Delete(Frames.Count - 1);
         Stack.Delete(Stack.Count - 1);
@@ -149,12 +184,18 @@ begin
         Stack.Delete(Stack.Count - 1);
         Continue;
       end;
-      Next := Key(Edges[Frame.NextEdge].Consumer);
+      if Edges[Frame.NextEdge].UsedPath <> '' then
+      begin
+        if Edges[Frame.NextEdge].ConsumerPath <> '' then
+          Next := Key(Edges[Frame.NextEdge].ConsumerPath)
+        else Next := Key(Edges[Frame.NextEdge].SourceFile);
+      end
+      else Next := Key(Edges[Frame.NextEdge].Consumer);
       Inc(Frame.NextEdge);
       Frames[Frames.Count - 1] := Frame;
       if Stack.Contains(Next) then
       begin
-        Output.Add(String.Join(' -> ', Stack.ToArray) + ' -> ' + Next + ' [CYCLE]');
+        Output.Add(PathText(Stack) + ' -> ' + NodeText(Next) + ' [CYCLE]');
         Stopped := Output.Count >= MaxPaths;
         Continue;
       end;

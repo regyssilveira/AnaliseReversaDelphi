@@ -1,3 +1,3 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <PropertyGroup><MainSource>Small.dpr</MainSource><DCC_UnitSearchPath>.</DCC_UnitSearchPath></PropertyGroup>
+  <PropertyGroup><MainSource>Small.dpr</MainSource><Platform Condition="'$(Platform)'==''">Win32</Platform><DCC_UnitSearchPath>.</DCC_UnitSearchPath></PropertyGroup>
 </Project>

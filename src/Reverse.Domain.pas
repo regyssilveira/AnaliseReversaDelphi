@@ -7,7 +7,10 @@ uses System.SysUtils, System.Generics.Collections;
 type
   TDependency = record
     Consumer: string;
+    ConsumerPath: string;
     UsedName: string;
+    UsedPath: string;
+    DeclaredPath: string;
     SourceFile: string;
     Section: string;
     Line: Integer;
@@ -21,6 +24,7 @@ type
   IUnitParser = interface
     ['{641C73C6-AD76-4E05-9AC7-D0FDD275508C}']
     function Parse(const FileName: string; Dependencies: TList<TDependency>): string;
+    function LastParseWasFallback: Boolean;
   end;
 
   ILogger = interface
@@ -35,6 +39,8 @@ implementation
 function Key(const Name: string): string;
 begin
   Result := LowerCase(Trim(Name));
+  if Result.Contains('\') or Result.Contains('/') or
+    (ExtractFileDrive(Result) <> '') then Exit;
   if SameText(ExtractFileExt(Result), '.pas') then
     Result := ChangeFileExt(Result, '');
 end;
