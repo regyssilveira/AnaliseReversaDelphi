@@ -24,12 +24,11 @@ cd delphi-unit-backtrace
 .\tools\Build.ps1 -Platform Win64
 .\tools\Build.ps1 -Tests -Platform Win64
 .\bin\Win64\UnitBacktraceTests.exe
-.\tools\Package-Release.ps1 -Version dev -Platform Win64
 ```
 
 O script usa a instalação local `C:\Program Files (x86)\Embarcadero\Studio\37.0`. Para outro local, ajuste `$bdsRoot` em `tools/Build.ps1`. Os projetos `.dproj` também estão na raiz. DUnitX acompanha o RAD Studio 13; o DelphiAST é um submódulo Git.
 
-O pacote ZIP gerado inclui o executável, a licença Apache, o `NOTICE`, as atribuições e os textos das licenças do parser. A release também oferece o `.exe` separado para testes rápidos.
+O executável para testes locais fica em `bin\Win64\UnitBacktrace.exe`. A análise gera `result.txt`, `graph.dot` e `analysis.log` na pasta indicada por `--output`.
 
 ## Log e códigos de saída
 
@@ -92,4 +91,4 @@ digraph UnitBacktrace {
 
 ## Licença
 
-O código desta ferramenta está sob [Apache-2.0](LICENSE). O submódulo DelphiAST mantém suas licenças originais: MPL-2.0 para DelphiAST e avisos MPL-1.1 em quatro arquivos do SimpleParser usados no executável. Consulte [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) e [NOTICE](NOTICE) para atribuições e acesso às fontes. As versões anteriores distribuídas sob MIT preservam aqueles termos.
+O código desta ferramenta está sob [Apache-2.0](LICENSE). O submódulo DelphiAST mantém suas licenças originais: MPL-2.0 para DelphiAST e avisos MPL-1.1 em quatro arquivos do SimpleParser usados no executável. Consulte [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) e [NOTICE](NOTICE) para atribuições e acesso às fontes. O histórico Git preserva os commits anteriores sob MIT.

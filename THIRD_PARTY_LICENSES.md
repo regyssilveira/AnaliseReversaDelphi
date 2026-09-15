@@ -20,6 +20,6 @@ notices in their source headers:
 
 Their license text is included in [licenses/MPL-1.1.txt](licenses/MPL-1.1.txt).
 The original source and its notices are available in the pinned DelphiAST
-submodule above. Recipients of the executable can obtain the exact source by
-cloning this project with `--recurse-submodules` at the corresponding release
-tag, or by opening the pinned upstream commit.
+submodule above. Recipients of a locally built executable can obtain the exact
+source by cloning this project with `--recurse-submodules` at the Git commit
+used for that build, or by opening the pinned upstream commit.
