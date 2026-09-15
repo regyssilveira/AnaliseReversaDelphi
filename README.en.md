@@ -26,7 +26,7 @@ cd delphi-unit-backtrace
 
 The build script uses the local installation at `C:\Program Files (x86)\Embarcadero\Studio\37.0`. For another location, change `$bdsRoot` in `tools/Build.ps1`. DUnitX ships with RAD Studio 13; DelphiAST is a Git submodule.
 
-The executable for local testing is `bin\Win64\UnitBacktrace.exe`. Each analysis writes `result.txt`, `graph.dot`, and `analysis.log` to the directory selected by `--output`.
+The executable for local testing is `bin\Win64\UnitBacktrace.exe`. Each analysis writes `result.txt`, `graph.dot`, `graph.html`, and `analysis.log` to the directory selected by `--output`. Open `graph.html` in a browser to search nodes, show only paths reaching the DPR, and inspect the source file and line of each `uses` edge. The header indicates partial analysis. The HTML is self-contained and needs no installed graph renderer.
 
 The console reports source discovery, parsing, dependency resolution, graph traversal, and output writing. Counts and percentages use the known total for each stage; graph traversal remains an in-progress stage until it finishes. Updates are throttled to one every 500 ms per stage, plus stage start and completion.
 

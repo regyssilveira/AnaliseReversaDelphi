@@ -394,6 +394,10 @@ begin
         .Contains('Target -> A | interface'));
       Assert.IsTrue(TFile.ReadAllText(TPath.Combine(OutputDir, 'graph.dot'))
         .Contains('[label="Target"]'));
+      Assert.IsTrue(TFile.ReadAllText(TPath.Combine(OutputDir, 'graph.html'))
+        .Contains('Mostrar somente caminhos até o DPR'));
+      Assert.IsTrue(TFile.ReadAllText(TPath.Combine(OutputDir, 'graph.html'))
+        .Contains('section:"interface"'));
     finally
       Analysis.Free;
     end;

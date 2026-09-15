@@ -13,6 +13,7 @@ type
     TargetName: string;
     TargetFile: string;
     ProgramName: string;
+    ProgramFile: string;
     Graph: TReverseGraph;
     Reachable: TArray<TDependency>;
     Paths: TArray<string>;
@@ -81,6 +82,7 @@ var
 begin
   Stopwatch := TStopwatch.StartNew;
   Result := TAnalysisResult.Create;
+  Result.ProgramFile := Scope.ProgramFile;
   Result.PathEvaluationWasFallback := Scope.PathEvaluationWasFallback;
   Edges := TList<TDependency>.Create;
   Pending := TList<TDependency>.Create;

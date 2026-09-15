@@ -17,6 +17,7 @@ uses
   Reverse.Log in 'src\Reverse.Log.pas',
   Reverse.Progress in 'src\Reverse.Progress.pas',
   Reverse.Analysis in 'src\Reverse.Analysis.pas',
+  Reverse.Visual in 'src\Reverse.Visual.pas',
   Reverse.Output in 'src\Reverse.Output.pas';
 
 function OptionValue(const Option: string): string;
@@ -86,7 +87,8 @@ begin
         try
           Writeln('Gravando resultado e log...');
           TOutputWriter.WriteFiles(Analysis, OutputDir);
-          Writeln('Done: ' + OutputDir);
+          Writeln('Concluido: ' + OutputDir);
+          Writeln('Abra no navegador: ' + TPath.Combine(OutputDir, 'graph.html'));
           if (Analysis.FallbackCount > 0) or (Analysis.FailedCount > 0) or
             Analysis.PathEvaluationWasFallback or
             (Analysis.UnresolvedCount > 0) or

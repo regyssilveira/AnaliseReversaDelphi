@@ -15,7 +15,8 @@ type
 
 implementation
 
-uses System.SysUtils, System.IOUtils, System.Classes, Reverse.Domain;
+uses System.SysUtils, System.IOUtils, System.Classes, Reverse.Domain,
+  Reverse.Visual;
 
 function DotQuote(const Value: string): string;
 begin
@@ -62,6 +63,8 @@ begin
     Dot.Add('}');
     Report.SaveToFile(TPath.Combine(OutputDirectory, 'result.txt'), TEncoding.UTF8);
     Dot.SaveToFile(TPath.Combine(OutputDirectory, 'graph.dot'), TEncoding.UTF8);
+    TVisualWriter.WriteHtml(Result,
+      TPath.Combine(OutputDirectory, 'graph.html'));
   finally
     Dot.Free;
     Report.Free;

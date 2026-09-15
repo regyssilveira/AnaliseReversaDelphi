@@ -28,7 +28,7 @@ cd delphi-unit-backtrace
 
 O script usa a instalação local `C:\Program Files (x86)\Embarcadero\Studio\37.0`. Para outro local, ajuste `$bdsRoot` em `tools/Build.ps1`. Os projetos `.dproj` também estão na raiz. DUnitX acompanha o RAD Studio 13; o DelphiAST é um submódulo Git.
 
-O executável para testes locais fica em `bin\Win64\UnitBacktrace.exe`. A análise gera `result.txt`, `graph.dot` e `analysis.log` na pasta indicada por `--output`.
+O executável para testes locais fica em `bin\Win64\UnitBacktrace.exe`. A análise gera `result.txt`, `graph.dot`, `graph.html` e `analysis.log` na pasta indicada por `--output`. Abra `graph.html` no navegador para explorar o grafo sem instalar dependências. O painel permite buscar uma unit ou arquivo, destacar caminhos que chegam ao DPR e selecionar uma ligação para ver o arquivo e a linha do `uses`. O cabeçalho indica quando a análise é parcial.
 
 Durante a execução, o console informa a descoberta de arquivos, a análise dos fontes e a resolução das dependências. As contagens e porcentagens usam o total conhecido de cada etapa; a montagem do grafo aparece como etapa em andamento até terminar. As mensagens são limitadas a uma atualização a cada 500 ms por etapa, além do início e do fim. Exemplo:
 
@@ -41,7 +41,8 @@ Resolvendo dependencias: 0/5 (0%)
 Resolvendo dependencias: 5/5 (100%)
 Montando grafo reverso...
 Gravando resultado e log...
-Done: D:\Analise
+Concluido: D:\Analise
+Abra no navegador: D:\Analise\graph.html
 ```
 
 ## Log e códigos de saída
