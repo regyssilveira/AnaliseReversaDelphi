@@ -57,6 +57,57 @@ The release packaging script creates a ZIP containing the executable, Apache lic
 
 The current scope is declared `uses` dependencies. Unresolved and ambiguous references are logged and excluded from the graph. If MSBuild evaluation fails, `msbuild-fallback` is logged and textual path extraction may include other configurations; unknown `$(...)` path macros are logged for review. The reproducible synthetic fixture has 2,202 source files across a project and three external libraries. DUnitX tests cover parsing, fallback, includes, conditional MSBuild paths, file and namespace resolution, graph traversal, and console output.
 
+## Exemplo de saída / Sample output
+
+O projeto pequeno em `tests/fixtures/Small` permite reproduzir a saída sem bibliotecas externas. Execute a partir da raiz do repositório. / The small project in `tests/fixtures/Small` reproduces the output without external libraries. Run from the repository root.
+
+```powershell
+.\bin\Win64\UnitBacktrace.exe --project .\tests\fixtures\Small\Small.dproj --unit Target --no-global-path --output .\bin\readme-example-output
+```
+
+Trechos da execução; foram selecionadas as linhas principais, encurtados os prefixos dos caminhos absolutos e omitidos os horários do log. / Output excerpts; only the main lines are shown, absolute path prefixes were shortened, and log timestamps were omitted.
+
+`result.txt` mostra os caminhos reversos até o DPR e a linha que declarou cada `uses`. / `result.txt` shows reverse paths to the DPR and the line declaring each `uses`.
+
+```text
+Target: Target | ...\Small\Target.pas
+Project entry: Small
+Parsed: 4 | AST fallback: 0 | Failed: 0 | Unresolved: 0 | Ambiguous: 0 | Reachable edges: 5
+
+Reverse paths:
+Target -> A -> B -> Small [DPR]
+Target -> A -> Small [DPR]
+Target -> B -> Small [DPR]
+
+Evidence:
+Target -> A | interface | ...\Small\A.pas:3 | used file: ...\Small\Target.pas
+```
+
+`graph.dot` preserva todas as ligações alcançáveis; cada nó usa o caminho físico do arquivo. / `graph.dot` retains every reachable link; each node uses the file's physical path.
+
+```dot
+digraph UnitBacktrace {
+  rankdir=LR;
+  "...\\Target.pas" -> "...\\A.pas" [label="interface:3"];
+  "...\\Target.pas" -> "...\\B.pas" [label="interface:3"];
+  "...\\A.pas" -> "...\\B.pas" [label="interface:3"];
+  "...\\A.pas" -> "...\\Small.dpr" [label="program:4"];
+  "...\\B.pas" -> "...\\Small.dpr" [label="program:5"];
+}
+```
+
+`analysis.log` registra plataforma, avaliação de caminhos, dependências e resumo. / `analysis.log` records platform, path evaluation, dependencies, and a summary.
+
+```text
+[INFO] platform | Win32
+[INFO] config | Debug
+[INFO] msbuild-evaluated | DCC_UnitSearchPath | 1 entries
+[DEBUG] dependency | ...\Small\A.pas:3 | A uses Target
+[INFO] complete | 4 parsed; 0 fallback; 0 failed; 0 unresolved; 0 ambiguous; 5 reachable edges; 0 ms
+```
+
+`[DPR]` indica que o caminho alcançou a entrada do projeto; `interface:3` indica a seção e a linha da declaração. / `[DPR]` means the path reached the project entry point; `interface:3` identifies the section and line of the declaration.
+
 ## Licença / License
 
 O código desta ferramenta está sob [Apache-2.0](LICENSE). O submódulo DelphiAST mantém suas licenças originais: MPL-2.0 para DelphiAST e avisos MPL-1.1 em quatro arquivos do SimpleParser usados no executável. Consulte [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) e [NOTICE](NOTICE) para atribuições e acesso às fontes. As versões anteriores distribuídas sob MIT preservam aqueles termos.
