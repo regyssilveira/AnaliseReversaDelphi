@@ -17,7 +17,7 @@ $licensePath = Join-Path $stagePath 'licenses'
 New-Item -ItemType Directory -Force -Path $licensePath | Out-Null
 
 Copy-Item -LiteralPath $binaryPath -Destination $stagePath
-foreach ($name in @('LICENSE','NOTICE','README.md','THIRD_PARTY_LICENSES.md')) {
+foreach ($name in @('LICENSE','NOTICE','README.md','README.en.md','THIRD_PARTY_LICENSES.md')) {
     Copy-Item -LiteralPath (Join-Path $workspaceRoot $name) -Destination $stagePath
 }
 Copy-Item -LiteralPath (Join-Path $workspaceRoot 'licenses\MPL-1.1.txt') -Destination $licensePath
