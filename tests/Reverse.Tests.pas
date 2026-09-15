@@ -417,13 +417,14 @@ begin
       Assert.IsTrue(TFile.ReadAllText(TPath.Combine(OutputDir, 'graph.dot'))
         .Contains('[label="Target"]'));
       Assert.IsTrue(TFile.ReadAllText(TPath.Combine(OutputDir, 'graph.html'))
-        .Contains('Mostrar somente caminhos até o DPR'));
+        .Contains('Mostrar somente caminhos at' + #$00E9 + ' o DPR'));
       Assert.IsTrue(TFile.ReadAllText(TPath.Combine(OutputDir, 'graph.html'))
         .Contains('section:"interface"'));
       Assert.IsTrue(TFile.ReadAllText(TPath.Combine(OutputDir, 'graph.html'))
-        .Contains('Ver ligações da unit selecionada'));
+        .Contains('Ver liga' + #$00E7 + #$00F5 + 'es da unit selecionada'));
       Assert.IsTrue(TFile.ReadAllText(TPath.Combine(OutputDir, 'graph.html'))
-        .Contains('Ver caminho da seleção até o DPR'));
+        .Contains('Ver caminho da sele' + #$00E7 + #$00E3 +
+          'o at' + #$00E9 + ' o DPR'));
     finally
       Analysis.Free;
     end;
