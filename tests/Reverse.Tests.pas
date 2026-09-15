@@ -423,8 +423,10 @@ begin
       Assert.IsTrue(TFile.ReadAllText(TPath.Combine(OutputDir, 'graph.html'))
         .Contains('Ver liga' + #$00E7 + #$00F5 + 'es da unit selecionada'));
       Assert.IsTrue(TFile.ReadAllText(TPath.Combine(OutputDir, 'graph.html'))
-        .Contains('Ver caminho da sele' + #$00E7 + #$00E3 +
-          'o at' + #$00E9 + ' o DPR'));
+        .Contains('Isolar cadeia destacada'));
+      Assert.AreEqual(Scope.ProjectRoot, Analysis.ProjectRoot);
+      Assert.IsTrue(TFile.ReadAllText(TPath.Combine(OutputDir, 'graph.html'))
+        .Contains('projectRoot='));
     finally
       Analysis.Free;
     end;

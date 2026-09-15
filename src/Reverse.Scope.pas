@@ -35,6 +35,7 @@ type
     destructor Destroy; override;
     property Files: TList<string> read FFiles;
     property ProgramFile: string read FProgramFile;
+    property ProjectRoot: string read FRoot;
     property SearchDirectories: TList<string> read FSearchDirectories;
     property NamespaceOrder: TList<string> read FNamespaceOrder;
     property Platform: string read FPlatform;

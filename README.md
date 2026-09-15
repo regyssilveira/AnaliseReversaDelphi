@@ -24,11 +24,12 @@ cd delphi-unit-backtrace
 .\tools\Build.ps1 -Platform Win64
 .\tools\Build.ps1 -Tests -Platform Win64
 .\bin\Win64\UnitBacktraceTests.exe
+node .\tests\Visual.Trace.test.js .\bin\workflow-test\graph.html
 ```
 
-O script usa a instalação local `C:\Program Files (x86)\Embarcadero\Studio\37.0`. Para outro local, ajuste `$bdsRoot` em `tools/Build.ps1`. Os projetos `.dproj` também estão na raiz. DUnitX acompanha o RAD Studio 13; o DelphiAST é um submódulo Git.
+O script usa a instalação local `C:\Program Files (x86)\Embarcadero\Studio\37.0`. Para outro local, ajuste `$bdsRoot` em `tools/Build.ps1`. Os projetos `.dproj` também estão na raiz. DUnitX acompanha o RAD Studio 13; o DelphiAST é um submódulo Git. O teste opcional com Node.js verifica a lógica da cadeia no JavaScript gerado.
 
-O executável para testes locais fica em `bin\Win64\UnitBacktrace.exe`. A análise gera `result.txt`, `graph.dot`, `graph.html` e `analysis.log` na pasta indicada por `--output`. Abra `graph.html` no navegador para explorar o grafo sem instalar dependências. A busca lista até 30 units encontradas e centraliza a seleção. Você pode ver apenas suas ligações diretas, o caminho mais curto da seleção até o DPR ou todos os caminhos que chegam ao DPR. Clique em uma ligação para ver o arquivo e a linha do `uses`. O cabeçalho indica quando a análise é parcial.
+O executável para testes locais fica em `bin\Win64\UnitBacktrace.exe`. A análise gera `result.txt`, `graph.dot`, `graph.html` e `analysis.log` na pasta indicada por `--output`. Abra `graph.html` no navegador para explorar o grafo sem instalar dependências. A busca lista até 30 units encontradas e centraliza a seleção. Ao selecionar um arquivo, o grafo destaca uma cadeia de declarações `uses` até o DPR; se não houver essa ligação, destaca uma cadeia até um arquivo do projeto. O painel mostra o arquivo e a linha de cada passo. Você pode isolar essa cadeia, ver apenas as ligações diretas ou mostrar todos os caminhos até o DPR. Uma cadeia destacada não prova que remover só uma declaração elimina a dependência: outras rotas podem continuar, e resultados parciais exigem conferir o log. O cabeçalho indica quando a análise é parcial.
 
 A saída elimina linhas exatamente iguais de caminhos e evidências, além de declarações de nós e ligações repetidas no DOT. Relações com arquivo, seção ou linha diferentes continuam separadas. Projetos com muitos ramos podem produzir milhares de caminhos distintos mesmo após essa limpeza; a lista textual mantém o limite de 10.000 caminhos, enquanto o grafo conserva as ligações alcançáveis.
 

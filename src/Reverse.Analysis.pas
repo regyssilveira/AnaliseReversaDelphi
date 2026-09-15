@@ -14,6 +14,7 @@ type
     TargetFile: string;
     ProgramName: string;
     ProgramFile: string;
+    ProjectRoot: string;
     Graph: TReverseGraph;
     Reachable: TArray<TDependency>;
     Paths: TArray<string>;
@@ -83,6 +84,7 @@ begin
   Stopwatch := TStopwatch.StartNew;
   Result := TAnalysisResult.Create;
   Result.ProgramFile := Scope.ProgramFile;
+  Result.ProjectRoot := Scope.ProjectRoot;
   Result.PathEvaluationWasFallback := Scope.PathEvaluationWasFallback;
   Edges := TList<TDependency>.Create;
   Pending := TList<TDependency>.Create;

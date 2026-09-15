@@ -22,11 +22,12 @@ cd delphi-unit-backtrace
 .\tools\Build.ps1 -Platform Win64
 .\tools\Build.ps1 -Tests -Platform Win64
 .\bin\Win64\UnitBacktraceTests.exe
+node .\tests\Visual.Trace.test.js .\bin\workflow-test\graph.html
 ```
 
-The build script uses the local installation at `C:\Program Files (x86)\Embarcadero\Studio\37.0`. For another location, change `$bdsRoot` in `tools/Build.ps1`. DUnitX ships with RAD Studio 13; DelphiAST is a Git submodule.
+The build script uses the local installation at `C:\Program Files (x86)\Embarcadero\Studio\37.0`. For another location, change `$bdsRoot` in `tools/Build.ps1`. DUnitX ships with RAD Studio 13; DelphiAST is a Git submodule. The optional Node.js test checks the generated JavaScript trace logic.
 
-The executable for local testing is `bin\Win64\UnitBacktrace.exe`. Each analysis writes `result.txt`, `graph.dot`, `graph.html`, and `analysis.log` to the directory selected by `--output`. Open `graph.html` in a browser to search and center a unit, inspect its direct neighbors or shortest path to the DPR, show all paths reaching the DPR, and inspect the source file and line of each `uses` edge. Search lists up to 30 matches. The header indicates partial analysis. The HTML is self-contained and needs no installed graph renderer.
+The executable for local testing is `bin\Win64\UnitBacktrace.exe`. Each analysis writes `result.txt`, `graph.dot`, `graph.html`, and `analysis.log` to the directory selected by `--output`. Open `graph.html` in a browser to search and center a unit. Selecting a file highlights one chain of `uses` declarations to the DPR, or to a project file when the DPR is unreachable. The panel lists the source file and line for each step. You can isolate the chain, inspect direct neighbors, or show all paths reaching the DPR. One highlighted chain does not prove that removing a single declaration eliminates the dependency; other routes may remain, and partial results require log review. The HTML is self-contained and needs no installed graph renderer.
 
 Output generation removes exactly identical path and evidence lines, as well as duplicate DOT node and edge declarations. Dependencies with different files, sections, or source lines remain distinct. A large project can still have thousands of distinct reverse paths; the text listing is capped at 10,000 paths while the graph keeps reachable links.
 
