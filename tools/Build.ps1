@@ -8,6 +8,6 @@ $unitPaths = @('src','tests','vendor\DelphiAST\Source','vendor\DelphiAST\Source\
 $exeDir = Join-Path 'bin' $Platform
 $dcuDir = Join-Path 'obj' $Platform
 New-Item -ItemType Directory -Force $exeDir,$dcuDir | Out-Null
-$project = if ($Tests) { 'ReverseTests.dpr' } else { 'ReverseDependencies.dpr' }
+$project = if ($Tests) { 'UnitBacktraceTests.dpr' } else { 'UnitBacktrace.dpr' }
 & (Join-Path $bdsRoot "bin\$compiler") -B '-NSSystem;Winapi;Vcl;Xml' "-U$unitPaths" "-E$exeDir" "-N$dcuDir" $project
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

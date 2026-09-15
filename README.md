@@ -1,11 +1,11 @@
-# Analise Reversa Delphi / Delphi Reverse Dependencies
+# Delphi Unit Backtrace
 
 ## Português
 
 Ferramenta console para responder **quem usa uma unit Delphi e por quais caminhos ela chega ao DPR**. A entrada obrigatória é o arquivo `.dproj` e o nome da unit; o caminho do `.pas` é descoberto pelo programa. O resultado contém os caminhos reversos em `result.txt`, todas as ligações alcançáveis em `graph.dot` e decisões de análise em `analysis.log`.
 
 ```powershell
-ReverseDependencies.exe --project "D:\MeuERP\MeuERP.dproj" --unit uExtrator --output "D:\Analise"
+UnitBacktrace.exe --project "D:\MeuERP\MeuERP.dproj" --unit uExtrator --output "D:\Analise"
 ```
 
 O programa procura fontes recursivamente na pasta do projeto e avalia `DCC_UnitSearchPath` e `DCC_IncludePath` com o MSBuild do Delphi 13 para a configuração e plataforma selecionadas. Em uma máquina com Delphi 13, também lê o Search Path e o Browsing Path registrados na IDE para localizar fontes de bibliotecas. Os padrões vêm do `.dproj`; use `--platform Win32|Win64` e `--config Debug|Release` para selecioná-los. Se fontes de uma biblioteca estiverem fora desses caminhos, `--source-root DIR` acrescenta uma raiz recursiva; a opção pode ser repetida. Para analisar somente os caminhos do projeto, use `--no-global-path`.
@@ -19,11 +19,11 @@ O código separa modelos e interfaces (`Reverse.Domain`), leitura de fontes (`Re
 ### Compilar e testar no Delphi 13
 
 ```powershell
-git clone --recurse-submodules https://github.com/regyssilveira/AnaliseReversaDelphi.git
-cd AnaliseReversaDelphi
+git clone --recurse-submodules https://github.com/regyssilveira/delphi-unit-backtrace.git
+cd delphi-unit-backtrace
 .\tools\Build.ps1 -Platform Win64
 .\tools\Build.ps1 -Tests -Platform Win64
-.\bin\Win64\ReverseTests.exe
+.\bin\Win64\UnitBacktraceTests.exe
 ```
 
 O script usa a instalação local `C:\Program Files (x86)\Embarcadero\Studio\37.0`. Para outro local, ajuste `$bdsRoot` em `tools/Build.ps1`. Os projetos `.dproj` também estão na raiz. DUnitX acompanha o RAD Studio 13; o DelphiAST é um submódulo Git.
@@ -41,7 +41,7 @@ Esta versão analisa dependências declaradas em `uses`. Ela não verifica se um
 Console tool answering **which Delphi units use a selected unit, and through which paths it reaches the DPR**. Only a `.dproj` file and the unit name are required; the program finds the `.pas` file. Outputs are reverse paths in `result.txt`, all reachable links in `graph.dot`, and analysis decisions in `analysis.log`.
 
 ```powershell
-ReverseDependencies.exe --project "D:\MyApp\MyApp.dproj" --unit uExtractor --output "D:\Analysis"
+UnitBacktrace.exe --project "D:\MyApp\MyApp.dproj" --unit uExtractor --output "D:\Analysis"
 ```
 
 It scans the project directory and evaluates `DCC_UnitSearchPath` and `DCC_IncludePath` through Delphi 13 MSBuild for the selected configuration and platform. It also reads the IDE's registered Search and Browsing Paths for library sources. Defaults come from the `.dproj`; use `--platform Win32|Win64` and `--config Debug|Release` to select them. If library sources are outside these paths, repeat `--source-root DIR` to add recursive source roots. `--no-global-path` limits the scope to project paths. It parses interface and implementation `uses` clauses with [DelphiAST](https://github.com/RomanYankovsky/DelphiAST), falls back to token extraction for unsupported syntax, and identifies nodes by resolved file path. Short unit names use the project's namespace order. Textual path enumeration stops at 10,000 paths to avoid combinatorial explosion; DOT retains every reachable edge. Build and test with the Delphi 13 commands above.

@@ -1,4 +1,4 @@
-program ReverseDependencies;
+program UnitBacktrace;
 
 {$APPTYPE CONSOLE}
 
@@ -55,7 +55,7 @@ begin
     Target := OptionValue('--unit');
     if (ProjectFile = '') or (Target = '') then
     begin
-      Writeln('Usage: ReverseDependencies --project FILE.dproj --unit UnitName [--platform Win32|Win64] [--config Debug|Release] [--source-root DIR ...] [--output DIR] [--no-global-path]');
+      Writeln('Usage: UnitBacktrace --project FILE.dproj --unit UnitName [--platform Win32|Win64] [--config Debug|Release] [--source-root DIR ...] [--output DIR] [--no-global-path]');
       ExitCode := 2;
       Exit;
     end;

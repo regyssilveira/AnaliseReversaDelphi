@@ -43,7 +43,7 @@ begin
     for Path in Result.Paths do Report.Add(Path);
     Report.Add('');
     Report.Add('Evidence:');
-    Dot.Add('digraph ReverseDependencies {');
+    Dot.Add('digraph UnitBacktrace {');
     Dot.Add('  rankdir=LR;');
     for Edge in Result.Reachable do
     begin

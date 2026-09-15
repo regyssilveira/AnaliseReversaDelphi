@@ -2,7 +2,7 @@
   <PropertyGroup>
     <ProjectGuid>{32674B23-C9DD-42E6-A88E-241E11A9566A}</ProjectGuid>
     <ProjectVersion>19.0</ProjectVersion>
-    <MainSource>ReverseTests.dpr</MainSource>
+    <MainSource>UnitBacktraceTests.dpr</MainSource>
     <Config Condition="'$(Config)'==''">Debug</Config>
     <Platform Condition="'$(Platform)'==''">Win32</Platform>
     <TargetedPlatforms>1</TargetedPlatforms>

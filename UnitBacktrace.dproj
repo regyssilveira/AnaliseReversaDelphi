@@ -2,7 +2,7 @@
   <PropertyGroup>
     <ProjectGuid>{F8504C65-A9ED-4AA8-B2D9-9009A99CBF91}</ProjectGuid>
     <ProjectVersion>19.0</ProjectVersion>
-    <MainSource>ReverseDependencies.dpr</MainSource>
+    <MainSource>UnitBacktrace.dpr</MainSource>
     <Config Condition="'$(Config)'==''">Debug</Config>
     <Platform Condition="'$(Platform)'==''">Win32</Platform>
     <TargetedPlatforms>3</TargetedPlatforms>

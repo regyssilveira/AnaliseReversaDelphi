@@ -1,4 +1,4 @@
-program ReverseTests;
+program UnitBacktraceTests;
 
 {$APPTYPE CONSOLE}
 
