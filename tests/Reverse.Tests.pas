@@ -211,8 +211,12 @@ end;
 
 procedure TLogTests.FormatsProgressWithKnownAndUnknownTotals;
 begin
-  Assert.AreEqual('Analisando arquivos: 5/20 (25%)',
+  Assert.AreEqual('Analisando arquivos: [######------------------]  25% 5/20',
     TConsoleProgress.FormatLine('Analisando arquivos', 5, 20));
+  Assert.AreEqual('Analisando arquivos: [------------------------]   0% 0/20',
+    TConsoleProgress.FormatLine('Analisando arquivos', -5, 20));
+  Assert.AreEqual('Analisando arquivos: [########################] 100% 20/20',
+    TConsoleProgress.FormatLine('Analisando arquivos', 25, 20));
   Assert.AreEqual('Montando grafo reverso...',
     TConsoleProgress.FormatLine('Montando grafo reverso', 0, 0));
   Assert.AreEqual(#13 + 'Novo' + '   ',

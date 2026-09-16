@@ -93,9 +93,10 @@ assert.equal(initialMode(302), 'explore');
 
 const exploreBranch = script.split('\n').find(x => x.includes('else if(mode==="explore")'));
 assert.ok(exploreBranch, 'generated HTML must expand visible consumers on demand');
-function explore(expanded) {
+function explore(expanded, highlighted = []) {
   return vm.runInNewContext(`let visible; if(mode==="all"){} ${exploreBranch}\nvisible`, {
     mode: 'explore', expanded: new Set(expanded),
+    highlighted: new Set(highlighted),
     out: new Map([
       ['Target', [{ from: 'Target', to: 'A' }, { from: 'Target', to: 'B' }]],
       ['A', [{ from: 'A', to: 'App.dpr' }]],
@@ -105,5 +106,7 @@ function explore(expanded) {
 }
 assert.deepEqual([...explore(['Target'])].sort(), ['A', 'B', 'Target']);
 assert.deepEqual([...explore(['Target', 'A'])].sort(), ['A', 'App.dpr', 'B', 'Target']);
+assert.deepEqual([...explore(['Target'], ['Target', 'A', 'App.dpr'])].sort(),
+  ['A', 'App.dpr', 'B', 'Target'], 'the selected chain remains visible in explore mode');
 
 console.log('Visual trace tests passed');

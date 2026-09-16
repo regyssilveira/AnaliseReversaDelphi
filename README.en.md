@@ -45,7 +45,7 @@ The cut simulation lets you mark one or more `uses` declarations and see whether
 
 Output generation removes exactly identical path and evidence lines, as well as duplicate DOT node and edge declarations. Dependencies with different files, sections, or source lines remain distinct. A large project can still have thousands of distinct reverse paths; the text listing is capped at 10,000 paths while the graph keeps reachable links.
 
-The console reports source discovery, parsing, dependency resolution, graph traversal, and output writing. Counts and percentages use the known total for each stage; graph traversal remains in progress until it finishes. In an interactive terminal, progress replaces the current line and only the completed stage remains in the history. Redirected output uses separate lines so a saved log stays readable. Updates are throttled to one every 500 ms per stage, plus stage start and completion. At completion, a summary counts direct consumers, `uses` declarations and reachable links to the DPR, and indicates partial results.
+The console shows a 24-position bar, percentage, and count for every stage with a known total; graph traversal remains in progress until it finishes. In an interactive terminal, the bar replaces the current line and only the completed stage remains in the history. Redirected output uses separate lines so a saved log stays readable. Updates are throttled to one every 500 ms per stage, plus stage start and completion. At completion, a summary counts direct consumers, `uses` declarations and reachable links to the DPR, and indicates partial results.
 
 ## Logs and exit codes
 

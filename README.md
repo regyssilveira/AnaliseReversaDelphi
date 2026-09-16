@@ -47,15 +47,15 @@ O painel de simulação permite marcar uma ou mais declarações `uses` para ver
 
 A saída elimina linhas exatamente iguais de caminhos e evidências, além de declarações de nós e ligações repetidas no DOT. Relações com arquivo, seção ou linha diferentes continuam separadas. Projetos com muitos ramos podem produzir milhares de caminhos distintos mesmo após essa limpeza; a lista textual mantém o limite de 10.000 caminhos, enquanto o grafo conserva as ligações alcançáveis.
 
-Durante a execução, o console informa a descoberta de arquivos, a análise dos fontes e a resolução das dependências. As contagens e porcentagens usam o total conhecido de cada etapa; a montagem do grafo aparece como etapa em andamento até terminar. Em um terminal interativo, cada etapa atualiza a mesma linha e só a conclusão fica no histórico. Quando a saída é redirecionada, as atualizações ficam em linhas separadas para preservar um log legível. A frequência é limitada a uma atualização a cada 500 ms por etapa, além do início e do fim. Ao concluir, o resumo conta consumidores diretos, declarações `uses` e ligações alcançáveis até o DPR, e informa se a análise é parcial. Exemplo do histórico após a conclusão:
+Durante a execução, o console mostra uma barra de 24 posições, a porcentagem e a contagem de cada etapa com total conhecido; a montagem do grafo aparece como etapa em andamento até terminar. Em um terminal interativo, a barra atualiza na mesma linha e só a conclusão fica no histórico. Quando a saída é redirecionada, as atualizações ficam em linhas separadas para preservar um log legível. A frequência é limitada a uma atualização a cada 500 ms por etapa, além do início e do fim. Ao concluir, o resumo conta consumidores diretos, declarações `uses` e ligações alcançáveis até o DPR, e informa se a análise é parcial. Exemplo do histórico após a conclusão:
 
 ```text
 Preparando projeto e descobrindo arquivos...
 Arquivos descobertos: 4 | Win32 | Debug
-Analisando arquivos: 0/4 (0%)
-Analisando arquivos: 4/4 (100%)
-Resolvendo dependencias: 0/5 (0%)
-Resolvendo dependencias: 5/5 (100%)
+Analisando arquivos: [------------------------]   0% 0/4
+Analisando arquivos: [########################] 100% 4/4
+Resolvendo dependencias: [------------------------]   0% 0/5
+Resolvendo dependencias: [########################] 100% 5/5
 Montando grafo reverso...
 Gravando resultado e log...
 Concluido: D:\Analise

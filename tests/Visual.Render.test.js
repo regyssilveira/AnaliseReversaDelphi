@@ -30,6 +30,9 @@ class Element {
   addEventListener(name, handler) { this.handlers.set(name, handler); }
   click() { return this.handlers.get('click')?.(); }
   dispatch(name, event = {}) { return this.handlers.get(name)?.(event); }
+  closest(selector) {
+    return selector === '.node,.edge' && /(^| )(node|edge)( |$)/.test(this.attrs.class || '') ? this : null;
+  }
 }
 
 const elements = new Map();
@@ -60,10 +63,19 @@ const fileCount = Number(summary.match(/(\d+) arquivos/)?.[1] || 0);
 async function run() {
 if (fileCount > 250) {
   assert.equal(nodes().length, 2, 'large graph opens with the target and a direct consumer');
-  const firstConsumer = nodes().find(x => !x.attrs.class.includes('target'));
-  firstConsumer.click();
-  assert.equal(nodes().length, 3, 'selecting a consumer expands the next step');
-  nodes().find(x => x.attrs.class.includes('target')).click();
+  const targetNode = nodes().find(x => x.attrs.class.includes('target'));
+  const view = document.getElementById('viewport');
+  view.scrollLeft = 0; view.scrollTop = 0;
+  view.dispatch('pointerdown', { target: targetNode, pointerId: 1, clientX: 100, clientY: 100 });
+  view.dispatch('pointermove', { target: targetNode, clientX: 70, clientY: 70 });
+  assert.equal(view.scrollLeft, 0, 'pressing a node does not start graph panning');
+  assert.equal(view.scrollTop, 0, 'pressing a node keeps the viewport still');
+  targetNode.click();
+  assert.equal(nodes().length, fileCount,
+    'clicking a node makes its complete selected chain visible');
+  assert.equal(links().length, fileCount - 1);
+  assert.ok(links().every(x => x.attrs.class.includes('trace')),
+    'every edge in the selected chain is highlighted');
   vm.runInContext('gotoTraceStep(traceResult.edges.length-1)', context);
   assert.ok(document.getElementById('trace').children.some(x =>
     x.textContent?.includes('Passo 2201 de 2201')),
@@ -74,6 +86,14 @@ if (fileCount > 250) {
   assert.ok(links().length > 0);
   document.getElementById('allRoutes').click();
   assert.match(document.getElementById('status').textContent, /Todas as rotas resolvidas/);
+  assert.ok(links().every(x => x.attrs.class.includes('trace')),
+    'all DPR routes are highlighted without isolating a chain first');
+  const directRouteState = links().map(x => x.attrs.class);
+  document.getElementById('reset').click();
+  document.getElementById('route').click();
+  document.getElementById('allRoutes').click();
+  assert.deepEqual(links().map(x => x.attrs.class), directRouteState,
+    'all routes produces the same graph with or without a previous isolated chain');
   const cuts = document.getElementById('cuts');
   if (summary.includes('Target → Small')) {
     assert.equal(cuts.children.filter(x => x.tag === 'button').length, 2,

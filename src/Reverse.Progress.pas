@@ -24,7 +24,7 @@ type
 
 implementation
 
-uses System.SysUtils, Winapi.Windows;
+uses System.SysUtils, System.Math, Winapi.Windows;
 
 constructor TConsoleProgress.Create;
 var
@@ -86,10 +86,20 @@ end;
 
 class function TConsoleProgress.FormatLine(const Stage: string;
   Completed, Total: Integer): string;
+const
+  BarWidth = 24;
+var
+  SafeCompleted, Percent, Filled: Integer;
 begin
   if Total > 0 then
-    Result := Format('%s: %d/%d (%d%%)',
-      [Stage, Completed, Total, Trunc(Int64(Completed) * 100 / Total)])
+  begin
+    SafeCompleted := EnsureRange(Completed, 0, Total);
+    Percent := Trunc(Int64(SafeCompleted) * 100 / Total);
+    Filled := Trunc(Int64(SafeCompleted) * BarWidth / Total);
+    Result := Format('%s: [%s%s] %3d%% %d/%d',
+      [Stage, StringOfChar('#', Filled), StringOfChar('-', BarWidth - Filled),
+       Percent, SafeCompleted, Total]);
+  end
   else Result := Stage + '...';
 end;
 
