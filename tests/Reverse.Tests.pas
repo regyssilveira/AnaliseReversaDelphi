@@ -45,6 +45,13 @@ type
   end;
 
   [TestFixture]
+  TConsoleTests = class
+  public
+    [Test] procedure SeparatesDefaultOutputByProjectAndUnit;
+    [Test] procedure SummarizesOnlyDirectConsumersThatReachDpr;
+  end;
+
+  [TestFixture]
   TWorkflowTests = class
   public
     [Test] procedure DiscoversTargetByNameAndWritesEvidence;
@@ -68,9 +75,11 @@ type
 implementation
 
 uses Reverse.AST, Reverse.Scope, Reverse.Analysis, Reverse.Output, Reverse.Log,
+  Reverse.Cli,
   Reverse.Progress,
   Reverse.MSBuild,
-  System.SysUtils, System.IOUtils, System.Classes, SimpleParser.Lexer.Types;
+  System.SysUtils, System.IOUtils, System.Classes, System.RegularExpressions,
+  SimpleParser.Lexer.Types;
 
 type
   TFixedPathProvider = class(TInterfacedObject, IGlobalSourcePathProvider)
@@ -129,6 +138,59 @@ end;
 procedure TGraphTests.Setup;
 begin
   FGraph := TReverseGraph.Create;
+end;
+
+procedure TConsoleTests.SeparatesDefaultOutputByProjectAndUnit;
+var
+  Root, Output, OtherProject: string;
+begin
+  Root := TPath.GetFullPath('bin\console-output-test');
+  Output := TConsoleReport.DefaultOutputDirectory(Root,
+    'D:\Projects\Small.dproj', 'Target');
+  Assert.IsTrue(TRegEx.IsMatch(Output,
+    'analysis-output\\Small-[0-9a-fA-F]{8}\\Target$'));
+  OtherProject := TConsoleReport.DefaultOutputDirectory(Root,
+    'D:\Elsewhere\Small.dproj', 'Target');
+  Assert.AreNotEqual(Output, OtherProject);
+  Output := TConsoleReport.DefaultOutputDirectory(Root,
+    'D:\Projects\Small.dproj', '..\Other/Target');
+  Assert.IsTrue(TRegEx.IsMatch(Output,
+    'analysis-output\\Small-[0-9a-fA-F]{8}\\[^\\]+$'));
+  Assert.IsFalse(Output.Contains('..\'));
+end;
+
+procedure TConsoleTests.SummarizesOnlyDirectConsumersThatReachDpr;
+var
+  Analysis: TAnalysisResult;
+  Edges: TArray<TDependency>;
+  Lines: TArray<string>;
+  procedure AddEdge(const Index: Integer; const Used, Consumer: string);
+  begin
+    Edges[Index].UsedPath := Used;
+    Edges[Index].ConsumerPath := Consumer;
+  end;
+begin
+  Analysis := TAnalysisResult.Create;
+  try
+    Analysis.TargetFile := 'C:\Target.pas';
+    Analysis.ProgramFile := 'C:\App.dpr';
+    SetLength(Edges, 5);
+    AddEdge(0, 'C:\Target.pas', 'C:\A.pas');
+    AddEdge(1, 'C:\Target.pas', 'C:\B.pas');
+    AddEdge(2, 'C:\A.pas', 'C:\App.dpr');
+    AddEdge(3, 'C:\B.pas', 'C:\App.dpr');
+    AddEdge(4, 'C:\Target.pas', 'C:\Orphan.pas');
+    Analysis.Reachable := Edges;
+    Analysis.UnresolvedCount := 1;
+    Lines := TConsoleReport.SummaryLines(Analysis);
+    Assert.AreEqual(NativeInt(3), Length(Lines));
+    Assert.IsTrue(Lines[0].Contains('2 consumidores diretos'));
+    Assert.IsTrue(Lines[0].Contains('2 declaracoes uses'));
+    Assert.IsTrue(Lines[1].Contains('Caminho ate o DPR: sim'));
+    Assert.IsTrue(Lines[2].Contains('1 nao resolvidas'));
+  finally
+    Analysis.Free;
+  end;
 end;
 
 procedure TLogTests.PersistsDebugAndWarningsAfterClose;
@@ -971,6 +1033,7 @@ initialization
   TDUnitX.RegisterTestFixture(TGraphTests);
   TDUnitX.RegisterTestFixture(TAstTests);
   TDUnitX.RegisterTestFixture(TLogTests);
+  TDUnitX.RegisterTestFixture(TConsoleTests);
   TDUnitX.RegisterTestFixture(TWorkflowTests);
 
 end.

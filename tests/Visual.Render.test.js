@@ -18,25 +18,37 @@ class Element {
     this.checked = false;
     this.clientWidth = 900;
     this.clientHeight = 600;
+    this.scrollLeft = 0;
+    this.scrollTop = 0;
+    this.style = {};
+    this.classes = new Set();
+    this.classList = { add: x => this.classes.add(x), remove: x => this.classes.delete(x) };
   }
   setAttribute(key, value) { this.attrs[key] = String(value); }
   appendChild(child) { this.children.push(child); return child; }
   replaceChildren(...children) { this.children = children; }
   addEventListener(name, handler) { this.handlers.set(name, handler); }
-  click() { this.handlers.get('click')?.(); }
+  click() { return this.handlers.get('click')?.(); }
+  dispatch(name, event = {}) { return this.handlers.get(name)?.(event); }
 }
 
 const elements = new Map();
 const document = {
   getElementById(id) {
-    if (!elements.has(id)) elements.set(id, new Element(id));
+    if (!elements.has(id)) {
+      const element = new Element(id);
+      if (id === 'sectionFilter') element.value = 'all';
+      elements.set(id, element);
+    }
     return elements.get(id);
   },
   createElementNS(_namespace, tag) { return new Element(tag); },
   createElement(tag) { return new Element(tag); },
 };
 
-vm.runInNewContext(script, { document });
+const copied = [];
+const context = vm.createContext({ document, navigator: { clipboard: { writeText: async value => copied.push(value) } } });
+vm.runInContext(script, context);
 const graph = document.getElementById('graph');
 const nodes = () => graph.children.filter(x => x.tag === 'g');
 const links = () => graph.children.filter(x => x.tag === 'path');
@@ -45,11 +57,17 @@ assert.match(summary, /arquivos/);
 assert.ok(nodes().length > 0);
 
 const fileCount = Number(summary.match(/(\d+) arquivos/)?.[1] || 0);
+async function run() {
 if (fileCount > 250) {
   assert.equal(nodes().length, 2, 'large graph opens with the target and a direct consumer');
   const firstConsumer = nodes().find(x => !x.attrs.class.includes('target'));
   firstConsumer.click();
   assert.equal(nodes().length, 3, 'selecting a consumer expands the next step');
+  nodes().find(x => x.attrs.class.includes('target')).click();
+  vm.runInContext('gotoTraceStep(traceResult.edges.length-1)', context);
+  assert.ok(document.getElementById('trace').children.some(x =>
+    x.textContent?.includes('Passo 2201 de 2201')),
+    'long selected chains remain navigable through their final declaration');
   document.getElementById('allRoutes').click();
   assert.equal(nodes().length, fileCount, 'all resolved DPR routes remain accessible');
 } else {
@@ -60,6 +78,59 @@ if (fileCount > 250) {
   if (summary.includes('Target → Small')) {
     assert.equal(cuts.children.filter(x => x.tag === 'button').length, 2,
       'both converging direct consumers must be reviewed');
+    const section = document.getElementById('sectionFilter');
+    const allLinks = links().length;
+    section.value = 'interface'; section.dispatch('change');
+    assert.ok(links().length > 0 && links().length < allLinks, 'interface filter shows only its declarations');
+    section.value = 'program'; section.dispatch('change');
+    assert.equal(links().length, 2, 'DPR filter shows project entry declarations');
+    section.value = 'all'; section.dispatch('change');
+
+    const target = nodes().find(x => x.attrs.class.includes('target'));
+    target.click();
+    const trace = document.getElementById('trace');
+    assert.ok(trace.children.some(x => x.textContent?.includes('Passo 1 de')),
+      'selected route starts at its first step');
+    const controls = trace.children.find(x => x.id === 'traceControls');
+    controls.children[1].click();
+    assert.ok(trace.children.some(x => x.textContent?.includes('Passo 2 de')),
+      'next navigates through the selected chain');
+    document.getElementById('traceControls');
+    document.getElementById('zoomIn').click();
+    const enlarged = Number(graph.attrs.width);
+    document.getElementById('zoomOut').click();
+    assert.ok(Number(graph.attrs.width) < enlarged, 'zoom controls change SVG size');
+    document.getElementById('fitTrace').click();
+    assert.match(document.getElementById('status').textContent, /Cadeia isolada/);
+    document.getElementById('fitAll').click();
+    assert.ok(Number(graph.attrs.width) <= 900, 'fit visible graph uses viewport width');
+    document.getElementById('reset').click();
+
+    const direct = links().filter(x => x.children.some(y => y.tag === 'title' &&
+      /Target →/.test(y.textContent)));
+    assert.equal(direct.length, 2, 'fixture has two direct target consumers');
+    const cut = document.getElementById('cutToggle');
+    direct[0].click();
+    await document.getElementById('copySource').click();
+    assert.match(copied.at(-1), /\.pas:\d+$/i, 'copy includes declaration file and line');
+    cut.click();
+    assert.match(document.getElementById('simulation').children[1].textContent, /Ainda há caminho/,
+      'one cut leaves another route to DPR');
+    links().find(x => x.children.some(y => y.tag === 'title' &&
+      /Target →/.test(y.textContent) && y.textContent !== direct[0].children.find(z => z.tag === 'title').textContent)).click();
+    cut.click();
+    assert.match(document.getElementById('simulation').children[1].textContent, /Sem caminho/,
+      'both cuts disconnect the resolved graph');
+    document.getElementById('cutReset').click();
+    assert.match(document.getElementById('simulation').children[1].textContent, /Ainda há caminho/);
+
+    const view = document.getElementById('viewport');
+    view.scrollLeft = 50; view.scrollTop = 60;
+    view.dispatch('pointerdown', { pointerId: 1, clientX: 100, clientY: 100 });
+    view.dispatch('pointermove', { clientX: 80, clientY: 70 });
+    assert.equal(view.scrollLeft, 70, 'pointer dragging pans horizontally');
+    assert.equal(view.scrollTop, 90, 'pointer dragging pans vertically');
+    view.dispatch('pointerup');
   }
 }
 
@@ -70,5 +141,12 @@ if (script.includes('MissingUnit')) {
     x.textContent.includes('MissingUnit')),
     'potentially relevant unresolved references are visible');
 }
+if (summary.includes('Resultado parcial')) {
+  assert.ok(document.getElementById('simulation').children.some(x =>
+    x.textContent?.includes('Resultado parcial')),
+    'simulation warns that an unresolved graph cannot prove a complete cut');
+}
 
 console.log('Visual render tests passed');
+}
+run().catch(error => { console.error(error); process.exitCode = 1; });

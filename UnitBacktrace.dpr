@@ -18,6 +18,7 @@ uses
   Reverse.Progress in 'src\Reverse.Progress.pas',
   Reverse.Analysis in 'src\Reverse.Analysis.pas',
   Reverse.Visual in 'src\Reverse.Visual.pas',
+  Reverse.Cli in 'src\Reverse.Cli.pas',
   Reverse.Output in 'src\Reverse.Output.pas';
 
 function OptionValue(const Option: string): string;
@@ -64,7 +65,9 @@ begin
       Exit;
     end;
     OutputDir := OptionValue('--output');
-    if OutputDir = '' then OutputDir := TPath.Combine(GetCurrentDir, 'analysis-output');
+    if OutputDir = '' then
+      OutputDir := TConsoleReport.DefaultOutputDirectory(GetCurrentDir,
+        ProjectFile, Target);
     TDirectory.CreateDirectory(OutputDir);
     Logger := TFileLogger.Create(TPath.Combine(OutputDir, 'analysis.log'));
     Logger.Write('INFO', 'start', ProjectFile + ' | ' + Target);
@@ -88,6 +91,8 @@ begin
         try
           Writeln('Gravando resultado e log...');
           TOutputWriter.WriteFiles(Analysis, OutputDir);
+          for var SummaryLine in TConsoleReport.SummaryLines(Analysis) do
+            Writeln(SummaryLine);
           Writeln('Concluido: ' + OutputDir);
           Writeln('Abra no navegador: ' + TPath.Combine(OutputDir, 'graph.html'));
           if (Analysis.FallbackCount > 0) or (Analysis.FailedCount > 0) or
