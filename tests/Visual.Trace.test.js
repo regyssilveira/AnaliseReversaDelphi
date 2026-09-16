@@ -22,6 +22,8 @@ function check(edges, selected, projectRoot, program) {
   }
   return vm.runInNewContext(functions + '\ntrace(selected)', {
     out, selected, projectRoot, program,
+    isProjectOrigin: path => path.toLowerCase().startsWith(projectRoot.toLowerCase()),
+    originOf: () => 'unknown',
   });
 }
 
@@ -41,12 +43,14 @@ assert.equal(local.edges.length, 1);
 const missing = check([
   ['Lib.pas', 'Other.pas'],
 ], 'Lib.pas', 'C:/project/', 'C:/project/App.dpr');
-assert.equal(missing, null);
+assert.equal(missing.kind, 'NO_CONSUMER');
+assert.equal(missing.endpoint, 'Other.pas');
 
 const sibling = check([
   ['Lib.pas', 'C:/project-old/Sibling.pas'],
 ], 'Lib.pas', 'C:/project/', 'C:/project/App.dpr');
-assert.equal(sibling, null, 'a similarly named sibling directory is outside the project');
+assert.equal(sibling.kind, 'NO_CONSUMER',
+  'a similarly named sibling directory is outside the project');
 
 const cutStart = script.indexOf('function directCuts');
 const cutEnd = script.indexOf('function showCuts');
@@ -88,7 +92,7 @@ function initialMode(count) {
     Map, Set,
   });
 }
-assert.equal(initialMode(4), 'all');
+assert.equal(initialMode(4), 'explore');
 assert.equal(initialMode(302), 'explore');
 
 const exploreBranch = script.split('\n').find(x => x.includes('else if(mode==="explore")'));
@@ -108,5 +112,20 @@ assert.deepEqual([...explore(['Target'])].sort(), ['A', 'B', 'Target']);
 assert.deepEqual([...explore(['Target', 'A'])].sort(), ['A', 'App.dpr', 'B', 'Target']);
 assert.deepEqual([...explore(['Target'], ['Target', 'A', 'App.dpr'])].sort(),
   ['A', 'App.dpr', 'B', 'Target'], 'the selected chain remains visible in explore mode');
+
+const orderStart = script.indexOf('function destinationRank');
+const orderEnd = script.indexOf('function render');
+assert.ok(orderStart >= 0 && orderEnd > orderStart, 'generated HTML must contain crossing reduction');
+const groups = new Map([[0, ['A', 'B']], [1, ['X', 'Y']]]);
+vm.runInNewContext(script.slice(orderStart, orderEnd) + '\nreduceCrossings(groups,levels,visible)', {
+  groups,
+  levels: new Map([['A', 0], ['B', 0], ['X', 1], ['Y', 1]]),
+  visible: new Set(['A', 'B', 'X', 'Y']),
+  incoming: new Map([['X', [{ from: 'B' }]], ['Y', [{ from: 'A' }]]]),
+  out: new Map([['A', [{ to: 'Y' }]], ['B', [{ to: 'X' }]]]),
+  nodes: new Map(), program: 'App.dpr', isProjectOrigin: () => false, originOf: () => 'unknown',
+});
+assert.deepEqual(Array.from(groups.get(1)), ['Y', 'X'],
+  'barycentric ordering places nodes near their connected parents');
 
 console.log('Visual trace tests passed');

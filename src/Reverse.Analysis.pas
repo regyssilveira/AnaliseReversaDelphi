@@ -18,6 +18,8 @@ type
     Graph: TReverseGraph;
     Reachable: TArray<TDependency>;
     Paths: TArray<string>;
+    Routes: TArray<TRoutePath>;
+    SourceOrigins: TDictionary<string, TSourceOrigin>;
     Uncertain: TArray<TUncertainReference>;
     ParsedCount: Integer;
     FailedCount: Integer;
@@ -25,6 +27,7 @@ type
     PathEvaluationWasFallback: Boolean;
     UnresolvedCount: Integer;
     AmbiguousCount: Integer;
+    function RouteCount(const Destination: TRouteDestination): Integer;
     constructor Create;
     destructor Destroy; override;
   end;
@@ -48,10 +51,12 @@ constructor TAnalysisResult.Create;
 begin
   inherited;
   Graph := TReverseGraph.Create;
+  SourceOrigins := TDictionary<string, TSourceOrigin>.Create;
 end;
 
 destructor TAnalysisResult.Destroy;
 begin
+  SourceOrigins.Free;
   Graph.Free;
   inherited;
 end;
@@ -83,6 +88,11 @@ var
   NamespaceName, ChosenAlias: string;
   Uncertain: TList<TUncertainReference>;
   Warning: TUncertainReference;
+  procedure AddOrigin(const SourceFile: string);
+  begin
+    if (SourceFile <> '') and not Result.SourceOrigins.ContainsKey(Key(SourceFile)) then
+      Result.SourceOrigins.Add(Key(SourceFile), Scope.OriginOf(SourceFile));
+  end;
   procedure MarkUncertain(const Reason: string);
   begin
     Warning.Dependency := Edge;
@@ -253,8 +263,19 @@ begin
     if FProgress <> nil then FProgress.Report('Resolvendo dependencias', Pending.Count, Pending.Count);
     if FProgress <> nil then FProgress.Report('Montando grafo reverso', 0, 0);
     Result.Reachable := Result.Graph.Reachable(Result.TargetFile);
+    AddOrigin(Result.TargetFile);
+    AddOrigin(Result.ProgramFile);
+    for Edge in Result.Reachable do
+    begin
+      AddOrigin(Edge.UsedPath);
+      AddOrigin(Edge.ConsumerPath);
+    end;
     Result.Uncertain := Uncertain.ToArray;
-    Result.Paths := Result.Graph.Paths(Result.TargetFile, Scope.ProgramFile);
+    Result.Routes := Result.Graph.ClassifiedPaths(Result.TargetFile,
+      Scope.ProgramFile, Result.SourceOrigins);
+    SetLength(Result.Paths, Length(Result.Routes));
+    for I := 0 to High(Result.Routes) do
+      Result.Paths[I] := Result.Routes[I].Text;
     if FProgress <> nil then FProgress.Report('Montando grafo reverso', 1, 1);
     FLogger.Write('INFO', 'complete', Format('%d parsed; %d fallback; %d failed; %d unresolved; %d ambiguous; %d reachable edges; %d ms',
       [Result.ParsedCount, Result.FallbackCount, Result.FailedCount, Result.UnresolvedCount,
@@ -270,6 +291,17 @@ begin
     Uncertain.Free;
     Edges.Free;
   end;
+end;
+
+function TAnalysisResult.RouteCount(
+  const Destination: TRouteDestination): Integer;
+var
+  Route: TRoutePath;
+begin
+  Result := 0;
+  for Route in Routes do
+    if not Route.IsLimitMarker and (Route.Destination = Destination) then
+      Inc(Result);
 end;
 
 end.

@@ -12,6 +12,7 @@ type
     FFiles: TList<string>;
     FSeen: TDictionary<string, Boolean>;
     FSearchDirectories: TList<string>;
+    FOrigins: TDictionary<string, TSourceOrigin>;
     FNamespaceOrder: TList<string>;
     FDefines: TList<string>;
     FLogger: ILogger;
@@ -22,7 +23,10 @@ type
     FConfig: string;
     FPathEvaluator: IProjectPathEvaluator;
     FPathEvaluationWasFallback: Boolean;
-    procedure ScanDirectory(const Directory: string; Recursive: Boolean);
+    procedure RegisterFile(const FileName: string; Origin: TSourceOrigin;
+      ReplaceOrigin: Boolean = False);
+    procedure ScanDirectory(const Directory: string; Recursive: Boolean;
+      Origin: TSourceOrigin);
     procedure ReadSearchPaths(const ProjectFile: string);
     procedure ReadProgramReferences;
     procedure ReadGlobalSearchPaths(const Platform: string);
@@ -43,6 +47,7 @@ type
     property Platform: string read FPlatform;
     property Config: string read FConfig;
     property PathEvaluationWasFallback: Boolean read FPathEvaluationWasFallback;
+    function OriginOf(const FileName: string): TSourceOrigin;
   end;
 
 implementation
@@ -122,7 +127,8 @@ begin
     FNamespaceOrder.Add('Data');
     FNamespaceOrder.Add('Xml');
   end;
-  ScanDirectory(FRoot, True);
+  FOrigins := TDictionary<string, TSourceOrigin>.Create;
+  ScanDirectory(FRoot, True, soProject);
   ReadSearchPaths(ProjectFile);
   if UseGlobalSearchPaths then ReadGlobalSearchPaths(FPlatform);
   for var SourceRoot in AdditionalSourceRoots do
@@ -132,11 +138,11 @@ begin
       raise Exception.Create('Source root not found: ' + RootPath);
     if not FSearchDirectories.Contains(RootPath) then
       FSearchDirectories.Add(RootPath);
-    ScanDirectory(RootPath, True);
+    ScanDirectory(RootPath, True, soAdditionalRoot);
     FLogger.Write('INFO', 'source-root', RootPath);
   end;
   ReadProgramReferences;
-  FFiles.Add(FProgramFile);
+  RegisterFile(FProgramFile, soProjectReference, True);
   FLogger.Write('INFO', 'scope', Format('%d source files discovered', [FFiles.Count]));
 end;
 
@@ -153,11 +159,8 @@ begin
     if not TPath.IsPathRooted(PathName) then
       PathName := TPath.GetFullPath(TPath.Combine(
         ExtractFilePath(FProgramFile), PathName));
-    if FileExists(PathName) and not FSeen.ContainsKey(LowerCase(PathName)) then
-    begin
-      FSeen.Add(LowerCase(PathName), True);
-      FFiles.Add(PathName);
-    end
+    if FileExists(PathName) then
+      RegisterFile(PathName, soProjectReference, True)
     else if not FileExists(PathName) then
       FLogger.Write('WARN', 'program-reference-missing', PathName);
   end;
@@ -170,10 +173,35 @@ begin
   FNamespaceOrder.Free;
   FDefines.Free;
   FSearchDirectories.Free;
+  FOrigins.Free;
   inherited;
 end;
 
-procedure TProjectScope.ScanDirectory(const Directory: string; Recursive: Boolean);
+procedure TProjectScope.RegisterFile(const FileName: string;
+  Origin: TSourceOrigin; ReplaceOrigin: Boolean);
+var
+  FileKey, FullPath: string;
+begin
+  FullPath := TPath.GetFullPath(FileName);
+  FileKey := Key(FullPath);
+  if not FSeen.ContainsKey(FileKey) then
+  begin
+    FSeen.Add(FileKey, True);
+    FFiles.Add(FullPath);
+    FOrigins.Add(FileKey, Origin);
+  end
+  else if ReplaceOrigin then
+    FOrigins.AddOrSetValue(FileKey, Origin);
+end;
+
+function TProjectScope.OriginOf(const FileName: string): TSourceOrigin;
+begin
+  if not FOrigins.TryGetValue(Key(TPath.GetFullPath(FileName)), Result) then
+    Result := soUnknown;
+end;
+
+procedure TProjectScope.ScanDirectory(const Directory: string; Recursive: Boolean;
+  Origin: TSourceOrigin);
 var
   FileName: string;
   SearchOption: TSearchOption;
@@ -182,11 +210,7 @@ begin
   if Recursive then SearchOption := TSearchOption.soAllDirectories
   else SearchOption := TSearchOption.soTopDirectoryOnly;
   for FileName in TDirectory.GetFiles(Directory, '*.pas', SearchOption) do
-    if not FSeen.ContainsKey(LowerCase(FileName)) then
-    begin
-      FSeen.Add(LowerCase(FileName), True);
-      FFiles.Add(FileName);
-    end;
+    RegisterFile(FileName, Origin);
 end;
 
 procedure TProjectScope.ReadSearchPaths(const ProjectFile: string);
@@ -211,7 +235,7 @@ var
       if not FSearchDirectories.Contains(PathName) then
         FSearchDirectories.Add(PathName);
       if SameText(Kind, 'UnitSearchPath') then
-        ScanDirectory(PathName, False);
+        ScanDirectory(PathName, False, soProjectSearchPath);
     end
     else FLogger.Write('WARN', 'search-path-missing', PathName);
   end;
@@ -275,11 +299,8 @@ begin
     end;
     if not TPath.IsPathRooted(PathName) then
       PathName := TPath.GetFullPath(TPath.Combine(FRoot, PathName));
-    if FileExists(PathName) and not FSeen.ContainsKey(LowerCase(PathName)) then
-    begin
-      FSeen.Add(LowerCase(PathName), True);
-      FFiles.Add(PathName);
-    end;
+    if FileExists(PathName) then
+      RegisterFile(PathName, soProjectReference, True);
   end;
 end;
 
@@ -297,7 +318,7 @@ begin
     end;
     if not FSearchDirectories.Contains(PathName) then
       FSearchDirectories.Add(PathName);
-    ScanDirectory(PathName, False);
+    ScanDirectory(PathName, False, soGlobalSearchPath);
   end;
 end;
 

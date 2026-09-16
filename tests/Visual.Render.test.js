@@ -24,7 +24,10 @@ class Element {
     this.classes = new Set();
     this.classList = { add: x => this.classes.add(x), remove: x => this.classes.delete(x) };
   }
-  setAttribute(key, value) { this.attrs[key] = String(value); }
+  setAttribute(key, value) {
+    this.attrs[key] = String(value);
+    if (key === 'class') this.classes = new Set(String(value).split(/\s+/).filter(Boolean));
+  }
   appendChild(child) { this.children.push(child); return child; }
   replaceChildren(...children) { this.children = children; }
   addEventListener(name, handler) { this.handlers.set(name, handler); }
@@ -33,6 +36,16 @@ class Element {
   closest(selector) {
     return selector === '.node,.edge' && /(^| )(node|edge)( |$)/.test(this.attrs.class || '') ? this : null;
   }
+  querySelectorAll(selector) {
+    const wanted = selector.split(',').map(x => x.trim().replace(/^\./, ''));
+    const result = [];
+    const visit = element => {
+      if (wanted.some(x => element.classes.has(x))) result.push(element);
+      for (const child of element.children) visit(child);
+    };
+    for (const child of this.children) visit(child);
+    return result;
+  }
 }
 
 const elements = new Map();
@@ -40,7 +53,7 @@ const document = {
   getElementById(id) {
     if (!elements.has(id)) {
       const element = new Element(id);
-      if (id === 'sectionFilter') element.value = 'all';
+      if (id === 'sectionFilter' || id === 'originFilter') element.value = 'all';
       elements.set(id, element);
     }
     return elements.get(id);
@@ -60,7 +73,17 @@ assert.match(summary, /arquivos/);
 assert.ok(nodes().length > 0);
 
 const fileCount = Number(summary.match(/(\d+) arquivos/)?.[1] || 0);
+const initialNodeCount = nodes().length;
+assert.ok(initialNodeCount <= fileCount);
+const routeGroups = document.getElementById('routePanel').children.filter(x => x.tag === 'details');
+assert.equal(routeGroups.length, 5, 'route list is grouped by destination');
+const routeButtons = routeGroups.flatMap(x => x.children.filter(y => y.tag === 'button'));
+assert.ok(routeButtons.length > 0, 'route list exposes selectable routes');
 async function run() {
+document.getElementById('reset').click();
+assert.equal(nodes().length, fileCount, 'full graph button restores the complete graph');
+document.getElementById('progressiveView').click();
+assert.equal(nodes().length, initialNodeCount, 'progressive view button restores the clean initial graph');
 if (fileCount > 250) {
   assert.equal(nodes().length, 2, 'large graph opens with the target and a direct consumer');
   const targetNode = nodes().find(x => x.attrs.class.includes('target'));
@@ -84,8 +107,13 @@ if (fileCount > 250) {
   assert.equal(nodes().length, fileCount, 'all resolved DPR routes remain accessible');
 } else {
   assert.ok(links().length > 0);
+  assert.ok(initialNodeCount < fileCount, 'small graphs also start in progressive mode');
+  routeButtons[0].click();
+  assert.match(document.getElementById('status').textContent, /Cadeia isolada/,
+    'selecting a listed route isolates it in the graph');
+  document.getElementById('reset').click();
   document.getElementById('allRoutes').click();
-  assert.match(document.getElementById('status').textContent, /Todas as rotas resolvidas/);
+  assert.match(document.getElementById('status').textContent, /Rotas até o DPR/);
   assert.ok(links().every(x => x.attrs.class.includes('trace')),
     'all DPR routes are highlighted without isolating a chain first');
   const directRouteState = links().map(x => x.attrs.class);
@@ -124,6 +152,35 @@ if (fileCount > 250) {
     assert.match(document.getElementById('status').textContent, /Cadeia isolada/);
     document.getElementById('fitAll').click();
     assert.ok(Number(graph.attrs.width) <= 900, 'fit visible graph uses viewport width');
+    document.getElementById('reset').click();
+
+    document.getElementById('collapseBranch').click();
+    assert.equal(nodes().length, 1, 'collapsing the target leaves only its box');
+    document.getElementById('expandDpr').click();
+    assert.ok(nodes().some(x => x.attrs.class.includes('dpr')),
+      'expand to DPR reveals the project entry point');
+    assert.ok(document.getElementById('trace').children.some(x =>
+      x.textContent === 'Cadeia até o DPR'));
+    document.getElementById('reset').click();
+    document.getElementById('collapseBranch').click();
+    document.getElementById('expandBranch').click();
+    assert.ok(nodes().length > 1 && nodes().length < fileCount,
+      'expanding one branch reveals only the next level');
+    document.getElementById('expandEnd').click();
+    assert.equal(nodes().length, fileCount, 'expand to end reveals the complete branch');
+    document.getElementById('hideBranch').click();
+    assert.equal(nodes().length, 1, 'hide branch removes its consumers');
+    document.getElementById('reset').click();
+
+    const hoverTarget = nodes().find(x => x.attrs.class.includes('target'));
+    hoverTarget.dispatch('mouseenter');
+    assert.ok(links().some(x => x.classes.has('hover')), 'hover highlights a related chain');
+    assert.ok(links().some(x => x.classes.has('hover-muted')), 'hover fades unrelated links');
+    hoverTarget.dispatch('mouseleave');
+    assert.ok(links().every(x => !x.classes.has('hover') && !x.classes.has('hover-muted')));
+    hoverTarget.dispatch('dblclick');
+    assert.match(document.getElementById('status').textContent, /Cadeia isolada/,
+      'double-click isolates the node route');
     document.getElementById('reset').click();
 
     const direct = links().filter(x => x.children.some(y => y.tag === 'title' &&
@@ -165,6 +222,24 @@ if (summary.includes('Resultado parcial')) {
   assert.ok(document.getElementById('simulation').children.some(x =>
     x.textContent?.includes('Resultado parcial')),
     'simulation warns that an unresolved graph cannot prove a complete cut');
+}
+if (/1 biblioteca/.test(summary)) {
+  document.getElementById('outsideRoutes').click();
+  assert.match(document.getElementById('status').textContent, /Usos fora do DPR/);
+  assert.equal(links().length, 3, 'all non-DPR dependency links are visible');
+  assert.ok(links().every(x => x.attrs.class.includes('trace')),
+    'non-DPR dependency links are highlighted');
+  assert.ok(nodes().some(x => x.attrs.class.includes('origin-project-search-path')),
+    'library nodes expose their project Search Path origin');
+  const origin = document.getElementById('originFilter');
+  origin.value = 'project-search-path'; origin.dispatch('change');
+  assert.equal(links().length, 2, 'origin filter keeps the selected library branch');
+  document.getElementById('reset').click();
+  const terminalNames = ['Detached', 'ProjectOnly', 'LibraryRoot'];
+  const terminalX = nodes().filter(node => node.children.some(child => child.tag === 'title' &&
+    terminalNames.some(name => child.textContent?.startsWith(name + '\n'))))
+    .map(node => node.children.find(child => child.tag === 'rect').attrs.x);
+  assert.equal(new Set(terminalX).size, 1, 'all route destinations share the final column');
 }
 
 console.log('Visual render tests passed');

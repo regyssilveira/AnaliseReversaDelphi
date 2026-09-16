@@ -19,6 +19,7 @@ type
     [Test] procedure PreservesConvergingPaths;
     [Test] procedure StopsAtCycle;
     [Test] procedure ReportsOrphanBranch;
+    [Test] procedure ClassifiesTerminalOrigins;
     [Test] procedure KeepsAllEdgesAfterRevisitingNode;
     [Test] procedure LimitsPathEnumerationWithoutDroppingGraphEdges;
     [Test] procedure KeepsSameNamedFilesSeparateWhenPathsAreKnown;
@@ -68,6 +69,7 @@ type
     [Test] procedure MarksMsbuildFailureAsPartial;
     [Test] procedure FindsUnitRecursivelyInAdditionalSourceRoot;
     [Test] procedure UsesInjectedGlobalPathProvider;
+    [Test] procedure ClassifiesDprProjectAndLibraryRoutes;
     [Test] procedure RetainsUnresolvedReferencesForVisualReview;
     [Test] procedure ProjectDefineChangesReverseRoutesBetweenConfigurations;
   end;
@@ -183,11 +185,12 @@ begin
     Analysis.Reachable := Edges;
     Analysis.UnresolvedCount := 1;
     Lines := TConsoleReport.SummaryLines(Analysis);
-    Assert.AreEqual(NativeInt(3), Length(Lines));
+    Assert.AreEqual(NativeInt(4), Length(Lines));
     Assert.IsTrue(Lines[0].Contains('2 consumidores diretos'));
     Assert.IsTrue(Lines[0].Contains('2 declaracoes uses'));
     Assert.IsTrue(Lines[1].Contains('Caminho ate o DPR: sim'));
-    Assert.IsTrue(Lines[2].Contains('1 nao resolvidas'));
+    Assert.IsTrue(Lines[2].Contains('Rotas:'));
+    Assert.IsTrue(Lines[3].Contains('1 nao resolvidas'));
   finally
     Analysis.Free;
   end;
@@ -257,6 +260,8 @@ end;
 procedure TGraphTests.StopsAtCycle;
 var
   Paths: TArray<string>;
+  Routes: TArray<TRoutePath>;
+  Origins: TDictionary<string, TSourceOrigin>;
 begin
   AddEdge('Target', 'A');
   AddEdge('A', 'B');
@@ -264,12 +269,43 @@ begin
   Paths := FGraph.Paths('Target', 'Root');
   Assert.AreEqual(NativeInt(1), Length(Paths));
   Assert.IsTrue(Paths[0].Contains('[CYCLE]'));
+  Origins := TDictionary<string, TSourceOrigin>.Create;
+  try
+    Routes := FGraph.ClassifiedPaths('Target', 'Root', Origins);
+    Assert.AreEqual(NativeInt(1), Length(Routes));
+    Assert.AreEqual(rdCycle, Routes[0].Destination);
+  finally
+    Origins.Free;
+  end;
 end;
 
 procedure TGraphTests.ReportsOrphanBranch;
 begin
   AddEdge('Target', 'Orphan');
   Assert.IsTrue(FGraph.Paths('Target', 'Root')[0].Contains('[NO CONSUMER]'));
+end;
+
+procedure TGraphTests.ClassifiesTerminalOrigins;
+var
+  Origins: TDictionary<string, TSourceOrigin>;
+  Routes: TArray<TRoutePath>;
+begin
+  AddEdge('Target', 'ProjectOnly');
+  AddEdge('Target', 'LibraryOnly');
+  AddEdge('Target', 'UnknownOnly');
+  Origins := TDictionary<string, TSourceOrigin>.Create;
+  try
+    Origins.Add(Key('Target'), soProjectSearchPath);
+    Origins.Add(Key('ProjectOnly'), soProject);
+    Origins.Add(Key('LibraryOnly'), soProjectSearchPath);
+    Routes := FGraph.ClassifiedPaths('Target', 'Root', Origins);
+    Assert.AreEqual(NativeInt(3), Length(Routes));
+    Assert.AreEqual(rdProjectFile, Routes[0].Destination);
+    Assert.AreEqual(rdLibraryRoot, Routes[1].Destination);
+    Assert.AreEqual(rdNoConsumer, Routes[2].Destination);
+  finally
+    Origins.Free;
+  end;
 end;
 
 procedure TGraphTests.KeepsAllEdgesAfterRevisitingNode;
@@ -304,6 +340,8 @@ var
   I: Integer;
   PreviousA, PreviousB, CurrentA, CurrentB: string;
   Paths: TArray<string>;
+  Routes: TArray<TRoutePath>;
+  Origins: TDictionary<string, TSourceOrigin>;
 begin
   PreviousA := 'Target';
   PreviousB := 'Target';
@@ -326,6 +364,14 @@ begin
   Paths := FGraph.Paths('Target', 'Root', 10);
   Assert.AreEqual(NativeInt(11), Length(Paths));
   Assert.IsTrue(Paths[10].Contains('LIMITED'));
+  Origins := TDictionary<string, TSourceOrigin>.Create;
+  try
+    Routes := FGraph.ClassifiedPaths('Target', 'Root', Origins, 10);
+    Assert.AreEqual(NativeInt(11), Length(Routes));
+    Assert.IsTrue(Routes[10].IsLimitMarker);
+  finally
+    Origins.Free;
+  end;
   Assert.IsTrue(Length(FGraph.Reachable('Target')) > 20);
 end;
 
@@ -698,6 +744,8 @@ begin
   try
     Assert.IsTrue(SameText(ExtractFileName(Scope.ProgramFile), 'ActualProgram.dpr'));
     Assert.AreEqual(NativeInt(2), Scope.Files.Count);
+    Assert.AreEqual(soProjectReference, Scope.OriginOf(TPath.GetFullPath(
+      'tests\fixtures\External\Library\ExternalTarget.pas')));
     Analysis := Analyzer.Run(Scope, 'ExternalTarget');
     try
       Assert.AreEqual(NativeInt(1), Length(Analysis.Reachable));
@@ -726,6 +774,11 @@ begin
   Analyzer := TAnalyzer.Create(TAstUnitParser.Create(
     Scope.SearchDirectories.ToArray), Logger);
   try
+    Assert.AreEqual(soProjectSearchPath, Scope.OriginOf(TPath.GetFullPath(
+      'tests\fixtures\SearchPaths\Library\Target.pas')));
+    Assert.AreEqual(soProject, Scope.OriginOf(TPath.GetFullPath(
+      'tests\fixtures\SearchPaths\Project\Consumer.pas')));
+    Assert.AreEqual(soProjectReference, Scope.OriginOf(Scope.ProgramFile));
     Analysis := Analyzer.Run(Scope, 'Target');
     try
       Assert.AreEqual(NativeInt(2), Length(Analysis.Reachable));
@@ -977,6 +1030,8 @@ begin
   Analyzer := TAnalyzer.Create(TAstUnitParser.Create(
     Scope.SearchDirectories.ToArray, Logger), Logger);
   try
+    Assert.AreEqual(soAdditionalRoot, Scope.OriginOf(TPath.Combine(
+      LibraryRoot, 'Nested\ExternalTarget.pas')));
     Analysis := Analyzer.Run(Scope, 'ExternalTarget');
     try
       Assert.AreEqual(NativeInt(3), Scope.Files.Count);
@@ -1019,11 +1074,64 @@ begin
   Analyzer := TAnalyzer.Create(TAstUnitParser.Create(
     Scope.SearchDirectories.ToArray, Logger), Logger);
   try
+    Assert.AreEqual(soGlobalSearchPath, Scope.OriginOf(TPath.Combine(
+      LibraryRoot, 'InjectedTarget.pas')));
     Analysis := Analyzer.Run(Scope, 'InjectedTarget');
     try
       Assert.AreEqual(NativeInt(2), Scope.Files.Count);
       Assert.AreEqual(NativeInt(1), Length(Analysis.Reachable));
       Assert.AreEqual(0, Analysis.UnresolvedCount);
+    finally
+      Analysis.Free;
+    end;
+  finally
+    Analyzer.Free;
+    Scope.Free;
+  end;
+end;
+
+procedure TWorkflowTests.ClassifiesDprProjectAndLibraryRoutes;
+var
+  Root, ProjectRoot, LibraryRoot, ProjectFile: string;
+  Logger: ILogger;
+  Scope: TProjectScope;
+  Analyzer: TAnalyzer;
+  Analysis: TAnalysisResult;
+begin
+  Root := TPath.GetFullPath('bin\route-classification-test');
+  ProjectRoot := TPath.Combine(Root, 'Project');
+  LibraryRoot := TPath.Combine(Root, 'Library');
+  TDirectory.CreateDirectory(ProjectRoot);
+  TDirectory.CreateDirectory(LibraryRoot);
+  TFile.WriteAllText(TPath.Combine(LibraryRoot, 'Target.pas'),
+    'unit Target; interface implementation end.');
+  TFile.WriteAllText(TPath.Combine(LibraryRoot, 'LibraryConsumer.pas'),
+    'unit LibraryConsumer; interface uses Target; implementation end.');
+  TFile.WriteAllText(TPath.Combine(LibraryRoot, 'LibraryRoot.pas'),
+    'unit LibraryRoot; interface uses LibraryConsumer; implementation end.');
+  TFile.WriteAllText(TPath.Combine(ProjectRoot, 'ProjectConsumer.pas'),
+    'unit ProjectConsumer; interface uses Target; implementation end.');
+  TFile.WriteAllText(TPath.Combine(ProjectRoot, 'ProjectOnly.pas'),
+    'unit ProjectOnly; interface uses Target; implementation end.');
+  TFile.WriteAllText(TPath.Combine(ProjectRoot, 'Detached.dpr'),
+    'program Detached; uses ProjectConsumer; begin end.');
+  ProjectFile := TPath.Combine(ProjectRoot, 'Detached.dproj');
+  TFile.WriteAllText(ProjectFile,
+    '<Project><PropertyGroup><MainSource>Detached.dpr</MainSource>' +
+    '<DCC_UnitSearchPath>..\Library</DCC_UnitSearchPath></PropertyGroup></Project>');
+  Logger := TFileLogger.Create(TPath.Combine(Root, 'analysis.log'));
+  Scope := TProjectScope.Create(ProjectFile, Logger, 'Win64', False);
+  Analyzer := TAnalyzer.Create(TAstUnitParser.Create(
+    Scope.SearchDirectories.ToArray), Logger);
+  try
+    Analysis := Analyzer.Run(Scope, 'Target');
+    try
+      Assert.AreEqual(1, Analysis.RouteCount(rdDpr));
+      Assert.AreEqual(1, Analysis.RouteCount(rdProjectFile));
+      Assert.AreEqual(1, Analysis.RouteCount(rdLibraryRoot));
+      Assert.AreEqual(0, Analysis.RouteCount(rdNoConsumer));
+      Assert.AreEqual(soProjectSearchPath,
+        Analysis.SourceOrigins[Key(TPath.Combine(LibraryRoot, 'Target.pas'))]);
     finally
       Analysis.Free;
     end;

@@ -7,6 +7,12 @@ interface
 uses System.SysUtils, System.Generics.Collections;
 
 type
+  TSourceOrigin = (soProject, soProjectReference, soProjectSearchPath,
+    soGlobalSearchPath, soAdditionalRoot, soUnknown);
+
+  TRouteDestination = (rdDpr, rdProjectFile, rdLibraryRoot, rdNoConsumer,
+    rdCycle);
+
   TDependency = record
     Consumer: string;
     ConsumerPath: string;
@@ -26,6 +32,13 @@ type
   TUncertainReference = record
     Dependency: TDependency;
     Reason: string;
+  end;
+
+  TRoutePath = record
+    Text: string;
+    TerminalPath: string;
+    Destination: TRouteDestination;
+    IsLimitMarker: Boolean;
   end;
 
   IUnitParser = interface
@@ -57,6 +70,8 @@ type
 
 function Key(const Name: string): string;
 function DependencyIdentity(const Edge: TDependency): string;
+function SourceOriginName(const Origin: TSourceOrigin): string;
+function RouteDestinationName(const Destination: TRouteDestination): string;
 
 implementation
 
@@ -75,6 +90,33 @@ begin
     Edge.Consumer + #0 + Edge.ConsumerPath + #0 +
     Edge.DeclaredPath + #0 + Edge.SourceFile + #0 +
     Edge.Section + #0 + Edge.Line.ToString;
+end;
+
+function SourceOriginName(const Origin: TSourceOrigin): string;
+begin
+  case Origin of
+    soProject: Result := 'project';
+    soProjectReference: Result := 'project-reference';
+    soProjectSearchPath: Result := 'project-search-path';
+    soGlobalSearchPath: Result := 'global-search-path';
+    soAdditionalRoot: Result := 'additional-root';
+    soUnknown: Result := 'unknown';
+  else
+    Result := 'unknown';
+  end;
+end;
+
+function RouteDestinationName(const Destination: TRouteDestination): string;
+begin
+  case Destination of
+    rdDpr: Result := 'DPR';
+    rdProjectFile: Result := 'PROJECT';
+    rdLibraryRoot: Result := 'LIBRARY';
+    rdNoConsumer: Result := 'NO CONSUMER';
+    rdCycle: Result := 'CYCLE';
+  else
+    Result := 'UNKNOWN';
+  end;
 end;
 
 end.

@@ -45,6 +45,10 @@ begin
     Report.Add(Format('Parsed: %d | AST fallback: %d | Failed: %d | Unresolved: %d | Ambiguous: %d | Reachable edges: %d',
       [Result.ParsedCount, Result.FallbackCount, Result.FailedCount, Result.UnresolvedCount,
        Result.AmbiguousCount, Length(Result.Reachable)]));
+    Report.Add(Format('Routes: DPR %d | Project %d | Library %d | No consumer %d | Cycles %d',
+      [Result.RouteCount(rdDpr), Result.RouteCount(rdProjectFile),
+       Result.RouteCount(rdLibraryRoot), Result.RouteCount(rdNoConsumer),
+       Result.RouteCount(rdCycle)]));
     if Result.PathEvaluationWasFallback then
       Report.Add('Project path evaluation: MSBuild fallback; verify configuration-specific paths in analysis.log');
     Report.Add('');

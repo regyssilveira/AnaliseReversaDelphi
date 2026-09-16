@@ -110,15 +110,19 @@ begin
        Length(Analysis.Reachable), CountLabel(Length(Analysis.Reachable),
          'ligacao alcancavel', 'ligacoes alcancaveis')]),
       Format('Caminho ate o DPR: %s | Analise: %s',
-        [Connected, Status])];
+        [Connected, Status]),
+      Format('Rotas: %d DPR | %d projeto | %d biblioteca | %d sem consumidor | %d ciclos',
+        [Analysis.RouteCount(rdDpr), Analysis.RouteCount(rdProjectFile),
+         Analysis.RouteCount(rdLibraryRoot), Analysis.RouteCount(rdNoConsumer),
+         Analysis.RouteCount(rdCycle)])];
     if Partial then
     begin
-      SetLength(Result, 3);
-      Result[2] := Format('Confira analysis.log: %d nao resolvidas | %d ambiguas | %d falhas | %d fallbacks',
+      SetLength(Result, 4);
+      Result[3] := Format('Confira analysis.log: %d nao resolvidas | %d ambiguas | %d falhas | %d fallbacks',
         [Analysis.UnresolvedCount, Analysis.AmbiguousCount,
          Analysis.FailedCount, Analysis.FallbackCount]);
       if Analysis.PathEvaluationWasFallback then
-        Result[2] := Result[2] + ' | MSBuild fallback';
+        Result[3] := Result[3] + ' | MSBuild fallback';
     end;
   finally
     Queue.Free;

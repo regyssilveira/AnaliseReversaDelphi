@@ -4,7 +4,7 @@ unit Reverse.Graph;
 
 interface
 
-uses Reverse.Domain, System.Generics.Collections;
+uses Reverse.Domain, System.SysUtils, System.Generics.Collections;
 
 type
   TReverseGraph = class
@@ -22,12 +22,15 @@ type
     function Reachable(const Target: string): TArray<TDependency>;
     function Paths(const Target, ProgramName: string;
       MaxPaths: Integer = 10000): TArray<string>;
+    function ClassifiedPaths(const Target, ProgramName: string;
+      const SourceOrigins: TDictionary<string, TSourceOrigin>;
+      MaxPaths: Integer = 10000): TArray<TRoutePath>;
     property Consumers[const Used: string]: TList<TDependency> read GetConsumers;
   end;
 
 implementation
 
-uses System.SysUtils;
+uses System.StrUtils;
 
 constructor TReverseGraph.Create;
 begin
@@ -213,6 +216,114 @@ begin
       Stack.Add(Next);
     end;
     if Stopped then Output.Add('[PATH LIST LIMITED; GRAPH RETAINS ALL REACHABLE EDGES]');
+    Result := Output.ToArray;
+  finally
+    Frames.Free;
+    Stack.Free;
+    Output.Free;
+  end;
+end;
+
+function TReverseGraph.ClassifiedPaths(const Target, ProgramName: string;
+  const SourceOrigins: TDictionary<string, TSourceOrigin>;
+  MaxPaths: Integer): TArray<TRoutePath>;
+type
+  TFrame = record
+    Name: string;
+    NextEdge: Integer;
+  end;
+var
+  Output: TList<TRoutePath>;
+  Stack: TList<string>;
+  Frames: TList<TFrame>;
+  Stopped: Boolean;
+  Frame, ChildFrame: TFrame;
+  Edges: TList<TDependency>;
+  Next: string;
+  Route: TRoutePath;
+  Origin: TSourceOrigin;
+  procedure AddRoute(const Destination: TRouteDestination;
+    const TerminalPath, Text: string);
+  begin
+    Route.Destination := Destination;
+    Route.TerminalPath := TerminalPath;
+    Route.IsLimitMarker := False;
+    Route.Text := Text + ' [' + RouteDestinationName(Destination) + ']';
+    Output.Add(Route);
+    Stopped := Output.Count >= MaxPaths;
+  end;
+begin
+  if MaxPaths < 1 then raise Exception.Create('MaxPaths must be positive');
+  if SourceOrigins = nil then
+    raise Exception.Create('Source origins are required');
+  Output := TList<TRoutePath>.Create;
+  Stack := TList<string>.Create;
+  Frames := TList<TFrame>.Create;
+  try
+    Stopped := False;
+    Stack.Add(Key(Target));
+    Frame.Name := Key(Target);
+    Frame.NextEdge := 0;
+    Frames.Add(Frame);
+    while (Frames.Count > 0) and not Stopped do
+    begin
+      Frame := Frames[Frames.Count - 1];
+      if SameText(Frame.Name, ProgramName) then
+      begin
+        AddRoute(rdDpr, Frame.Name, PathText(Stack));
+        Frames.Delete(Frames.Count - 1);
+        Stack.Delete(Stack.Count - 1);
+        Continue;
+      end;
+      Edges := GetConsumers(Frame.Name);
+      if (Edges = nil) or (Edges.Count = 0) then
+      begin
+        if SameText(Frame.Name, Target) then
+          AddRoute(rdNoConsumer, Frame.Name, PathText(Stack))
+        else if not SourceOrigins.TryGetValue(Key(Frame.Name), Origin) then
+          AddRoute(rdNoConsumer, Frame.Name, PathText(Stack))
+        else if Origin in [soProject, soProjectReference] then
+          AddRoute(rdProjectFile, Frame.Name, PathText(Stack))
+        else if Origin = soUnknown then
+          AddRoute(rdNoConsumer, Frame.Name, PathText(Stack))
+        else
+          AddRoute(rdLibraryRoot, Frame.Name, PathText(Stack));
+        Frames.Delete(Frames.Count - 1);
+        Stack.Delete(Stack.Count - 1);
+        Continue;
+      end;
+      if Frame.NextEdge >= Edges.Count then
+      begin
+        Frames.Delete(Frames.Count - 1);
+        Stack.Delete(Stack.Count - 1);
+        Continue;
+      end;
+      if Edges[Frame.NextEdge].UsedPath <> '' then
+      begin
+        if Edges[Frame.NextEdge].ConsumerPath <> '' then
+          Next := Key(Edges[Frame.NextEdge].ConsumerPath)
+        else Next := Key(Edges[Frame.NextEdge].SourceFile);
+      end
+      else Next := Key(Edges[Frame.NextEdge].Consumer);
+      Inc(Frame.NextEdge);
+      Frames[Frames.Count - 1] := Frame;
+      if Stack.Contains(Next) then
+      begin
+        AddRoute(rdCycle, Next, PathText(Stack) + ' -> ' + NodeText(Next));
+        Continue;
+      end;
+      ChildFrame.Name := Next;
+      ChildFrame.NextEdge := 0;
+      Frames.Add(ChildFrame);
+      Stack.Add(Next);
+    end;
+    if Stopped then
+    begin
+      Route := Default(TRoutePath);
+      Route.Text := '[PATH LIST LIMITED; GRAPH RETAINS ALL REACHABLE EDGES]';
+      Route.IsLimitMarker := True;
+      Output.Add(Route);
+    end;
     Result := Output.ToArray;
   finally
     Frames.Free;
