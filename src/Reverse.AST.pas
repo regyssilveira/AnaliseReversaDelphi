@@ -4,7 +4,8 @@ unit Reverse.AST;
 
 interface
 
-uses Reverse.Domain, System.Generics.Collections, DelphiAST, DelphiAST.Classes;
+uses Reverse.Domain, System.Generics.Collections, DelphiAST, DelphiAST.Classes,
+  SimpleParser.Lexer;
 
 type
   TAstUnitParser = class(TInterfacedObject, IUnitParser)
@@ -12,21 +13,26 @@ type
     FSearchPaths: TArray<string>;
     FLogger: ILogger;
     FLastFallback: Boolean;
+    FDefines: TArray<string>;
+    FPlatform: string;
+    procedure ConfigureDefines(const Lexer: TmwBasePasLex);
     procedure Collect(Node: TSyntaxNode; const Consumer, Section,
       FileName: string; Dependencies: TList<TDependency>);
     function ParseTokens(const FileName: string;
       Dependencies: TList<TDependency>): string;
   public
     constructor Create(const SearchPaths: TArray<string>;
-      const Logger: ILogger = nil); overload;
+      const Logger: ILogger = nil;
+      const Defines: TArray<string> = nil;
+      const Platform: string = ''); overload;
     function Parse(const FileName: string; Dependencies: TList<TDependency>): string;
     function LastParseWasFallback: Boolean;
   end;
 
 implementation
 
-uses System.SysUtils, System.IOUtils, DelphiAST.Consts,
-  SimpleParser.Lexer.Types, SimpleParser.Lexer;
+uses System.SysUtils, System.IOUtils, System.Classes, DelphiAST.Consts,
+  SimpleParser.Lexer.Types;
 
 type
   TRelativeIncludeHandler = class(TInterfacedObject, IIncludeHandler)
@@ -76,11 +82,43 @@ begin
 end;
 
 constructor TAstUnitParser.Create(const SearchPaths: TArray<string>;
-  const Logger: ILogger);
+  const Logger: ILogger; const Defines: TArray<string>;
+  const Platform: string);
 begin
   inherited Create;
   FSearchPaths := SearchPaths;
   FLogger := Logger;
+  FDefines := Defines;
+  FPlatform := Platform;
+end;
+
+procedure TAstUnitParser.ConfigureDefines(const Lexer: TmwBasePasLex);
+var
+  Symbol: string;
+begin
+  Lexer.InitDefinesDefinedByCompiler;
+  Lexer.RemoveDefine('CONSOLE');
+  if SameText(FPlatform, 'Win32') then
+  begin
+    Lexer.RemoveDefine('WIN64');
+    Lexer.RemoveDefine('CPUX64');
+    Lexer.RemoveDefine('CPU64BITS');
+    Lexer.AddDefine('WIN32');
+    Lexer.AddDefine('CPU386');
+    Lexer.AddDefine('CPUX86');
+    Lexer.AddDefine('CPU32BITS');
+  end
+  else if SameText(FPlatform, 'Win64') then
+  begin
+    Lexer.RemoveDefine('WIN32');
+    Lexer.RemoveDefine('CPU386');
+    Lexer.RemoveDefine('CPUX86');
+    Lexer.RemoveDefine('CPU32BITS');
+    Lexer.AddDefine('WIN64');
+    Lexer.AddDefine('CPUX64');
+    Lexer.AddDefine('CPU64BITS');
+  end;
+  for Symbol in FDefines do Lexer.AddDefine(Symbol);
 end;
 
 function TAstUnitParser.LastParseWasFallback: Boolean;
@@ -125,7 +163,7 @@ begin
   Lexer := TmwPasLex.Create;
   try
     Lexer.IncludeHandler := TRelativeIncludeHandler.Create(FileName, FSearchPaths);
-    Lexer.InitDefinesDefinedByCompiler;
+    ConfigureDefines(Lexer);
     Lexer.Origin := TFile.ReadAllText(FileName);
     while Lexer.TokenID <> ptNull do
     begin
@@ -212,11 +250,25 @@ function TAstUnitParser.Parse(const FileName: string;
   Dependencies: TList<TDependency>): string;
 var
   Root: TSyntaxNode;
+  Builder: TPasSyntaxTreeBuilder;
+  Stream: TStringStream;
 begin
   FLastFallback := False;
   try
-    Root := TPasSyntaxTreeBuilder.Run(FileName, False,
-      TRelativeIncludeHandler.Create(FileName, FSearchPaths));
+    Stream := TStringStream.Create;
+    try
+      Stream.LoadFromFile(FileName);
+      Builder := TPasSyntaxTreeBuilder.Create;
+      try
+        ConfigureDefines(Builder.Lexer.Lexer);
+        Builder.IncludeHandler := TRelativeIncludeHandler.Create(FileName, FSearchPaths);
+        Root := Builder.Run(Stream);
+      finally
+        Builder.Free;
+      end;
+    finally
+      Stream.Free;
+    end;
   except
     on E: Exception do
     begin

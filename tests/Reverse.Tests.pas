@@ -34,6 +34,7 @@ type
     [Test] procedure ReadsIncludeFromConfiguredSearchPath;
     [Test] procedure FailsWhenIncludeIsMissing;
     [Test] procedure ExtractsUsesWhenAstCannotParseLaterSyntax;
+    [Test] procedure RespectsProjectDefinesAndSelectedPlatform;
   end;
 
   [TestFixture]
@@ -60,6 +61,8 @@ type
     [Test] procedure MarksMsbuildFailureAsPartial;
     [Test] procedure FindsUnitRecursivelyInAdditionalSourceRoot;
     [Test] procedure UsesInjectedGlobalPathProvider;
+    [Test] procedure RetainsUnresolvedReferencesForVisualReview;
+    [Test] procedure ProjectDefineChangesReverseRoutesBetweenConfigurations;
   end;
 
 implementation
@@ -392,6 +395,36 @@ begin
   end;
 end;
 
+procedure TAstTests.RespectsProjectDefinesAndSelectedPlatform;
+var
+  Source: string;
+  Parser: IUnitParser;
+  Edges: TList<TDependency>;
+begin
+  Source := TPath.GetFullPath('bin\conditional-parser-test\Conditional.pas');
+  TDirectory.CreateDirectory(ExtractFilePath(Source));
+  TFile.WriteAllText(Source, 'unit Conditional; interface' + sLineBreak +
+    '{$IFDEF FEATURE_X} uses FeatureUnit; {$ENDIF}' + sLineBreak +
+    '{$IFDEF WIN32} uses Win32Unit; {$ENDIF}' + sLineBreak +
+    '{$IFDEF WIN64} uses Win64Unit; {$ENDIF}' + sLineBreak +
+    'implementation end.');
+  Edges := TList<TDependency>.Create;
+  try
+    Parser := TAstUnitParser.Create([], nil, ['FEATURE_X'], 'Win32');
+    Parser.Parse(Source, Edges);
+    Assert.AreEqual(NativeInt(2), Edges.Count);
+    Assert.AreEqual('FeatureUnit', Edges[0].UsedName);
+    Assert.AreEqual('Win32Unit', Edges[1].UsedName);
+    Edges.Clear;
+    Parser := TAstUnitParser.Create([], nil, [], 'Win64');
+    Parser.Parse(Source, Edges);
+    Assert.AreEqual(NativeInt(1), Edges.Count);
+    Assert.AreEqual('Win64Unit', Edges[0].UsedName);
+  finally
+    Edges.Free;
+  end;
+end;
+
 procedure TWorkflowTests.DiscoversTargetByNameAndWritesEvidence;
 var
   Logger: ILogger;
@@ -713,7 +746,7 @@ begin
     '<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">' +
     '<PropertyGroup><MainSource>Config.dpr</MainSource></PropertyGroup>' +
     '<PropertyGroup Condition="''$(Config)''==''Debug'' And ''$(Platform)''==''Win64''">' +
-    '<DCC_UnitSearchPath>Debug64</DCC_UnitSearchPath></PropertyGroup>' +
+    '<DCC_UnitSearchPath>Debug64</DCC_UnitSearchPath><DCC_Define>FEATURE_DEBUG</DCC_Define></PropertyGroup>' +
     '<PropertyGroup Condition="''$(Config)''==''Release'' And ''$(Platform)''==''Win32''">' +
     '<DCC_UnitSearchPath>Release32</DCC_UnitSearchPath></PropertyGroup>' +
     '</Project>');
@@ -726,8 +759,101 @@ begin
       'Debug64')));
     Assert.IsFalse(Scope.SearchDirectories.Contains(TPath.Combine(Root,
       'Release32')));
+    Assert.IsTrue(Scope.Defines.Contains('FEATURE_DEBUG'));
   finally
     Scope.Free;
+  end;
+end;
+
+procedure TWorkflowTests.RetainsUnresolvedReferencesForVisualReview;
+var
+  Root, ProjectFile: string;
+  Logger: ILogger;
+  Scope: TProjectScope;
+  Analyzer: TAnalyzer;
+  Analysis: TAnalysisResult;
+begin
+  Root := TPath.GetFullPath('bin\uncertain-reference-test');
+  TDirectory.CreateDirectory(Root);
+  ProjectFile := TPath.Combine(Root, 'Uncertain.dproj');
+  TFile.WriteAllText(ProjectFile,
+    '<Project><PropertyGroup><MainSource>Uncertain.dpr</MainSource></PropertyGroup></Project>');
+  TFile.WriteAllText(TPath.Combine(Root, 'Uncertain.dpr'),
+    'program Uncertain; uses Consumer in ''Consumer.pas''; begin end.');
+  TFile.WriteAllText(TPath.Combine(Root, 'Target.pas'),
+    'unit Target; interface implementation end.');
+  TFile.WriteAllText(TPath.Combine(Root, 'Consumer.pas'),
+    'unit Consumer; interface uses Target, MissingUnit; implementation end.');
+  Logger := TFileLogger.Create(TPath.Combine(Root, 'analysis.log'));
+  Scope := TProjectScope.Create(ProjectFile, Logger, 'Win64', False);
+  try
+    Analyzer := TAnalyzer.Create(TAstUnitParser.Create, Logger);
+    try
+      Analysis := Analyzer.Run(Scope, 'Target');
+      try
+        Assert.AreEqual(1, Analysis.UnresolvedCount);
+        Assert.AreEqual(NativeInt(1), Length(Analysis.Uncertain));
+        Assert.AreEqual('MissingUnit', Analysis.Uncertain[0].Dependency.UsedName);
+        Assert.AreEqual('unresolved-reference', Analysis.Uncertain[0].Reason);
+        Assert.IsTrue(Length(Analysis.Reachable) > 0);
+      finally
+        Analysis.Free;
+      end;
+    finally
+      Analyzer.Free;
+    end;
+  finally
+    Scope.Free;
+  end;
+end;
+
+procedure TWorkflowTests.ProjectDefineChangesReverseRoutesBetweenConfigurations;
+var
+  Root, ProjectFile, Config: string;
+  Logger: ILogger;
+  Scope: TProjectScope;
+  Analyzer: TAnalyzer;
+  Analysis: TAnalysisResult;
+begin
+  Root := TPath.GetFullPath('bin\conditional-workflow-test');
+  TDirectory.CreateDirectory(Root);
+  ProjectFile := TPath.Combine(Root, 'Conditional.dproj');
+  TFile.WriteAllText(ProjectFile,
+    '<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">' +
+    '<PropertyGroup><MainSource>Conditional.dpr</MainSource></PropertyGroup>' +
+    '<PropertyGroup Condition="''$(Config)''==''Debug''"><DCC_Define>FEATURE_X</DCC_Define></PropertyGroup>' +
+    '</Project>');
+  TFile.WriteAllText(TPath.Combine(Root, 'Conditional.dpr'),
+    'program Conditional; uses Consumer in ''Consumer.pas''; begin end.');
+  TFile.WriteAllText(TPath.Combine(Root, 'Target.pas'),
+    'unit Target; interface implementation end.');
+  TFile.WriteAllText(TPath.Combine(Root, 'Consumer.pas'),
+    'unit Consumer; interface {$IFDEF FEATURE_X} uses Target; {$ENDIF} implementation end.');
+  Logger := TFileLogger.Create(TPath.Combine(Root, 'analysis.log'));
+  for Config in ['Debug', 'Release'] do
+  begin
+    Scope := TProjectScope.Create(ProjectFile, Logger, 'Win64', False,
+      Config, TMSBuildPathEvaluator.Create(Logger));
+    try
+      Analyzer := TAnalyzer.Create(TAstUnitParser.Create(
+        Scope.SearchDirectories.ToArray, Logger, Scope.Defines.ToArray,
+        Scope.Platform), Logger);
+      try
+        Analysis := Analyzer.Run(Scope, 'Target');
+        try
+          Assert.IsFalse(Scope.PathEvaluationWasFallback);
+          if Config = 'Debug' then
+            Assert.AreEqual(NativeInt(2), Length(Analysis.Reachable))
+          else Assert.AreEqual(NativeInt(0), Length(Analysis.Reachable));
+        finally
+          Analysis.Free;
+        end;
+      finally
+        Analyzer.Free;
+      end;
+    finally
+      Scope.Free;
+    end;
   end;
 end;
 

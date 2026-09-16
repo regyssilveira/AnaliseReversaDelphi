@@ -70,7 +70,8 @@ var
   WaitResult, ExitStatus: DWORD;
 begin
   if not SameText(PropertyName, 'DCC_UnitSearchPath') and
-    not SameText(PropertyName, 'DCC_IncludePath') then
+    not SameText(PropertyName, 'DCC_IncludePath') and
+    not SameText(PropertyName, 'DCC_Define') then
     raise Exception.Create('Unsupported MSBuild property: ' + PropertyName);
   BuildExe := TPath.Combine(GetEnvironmentVariable('WINDIR'),
     'Microsoft.NET\Framework\v4.0.30319\MSBuild.exe');

@@ -81,7 +81,8 @@ begin
       Writeln(Format('Arquivos descobertos: %d | %s | %s',
         [Scope.Files.Count, Scope.Platform, Scope.Config]));
       Analyzer := TAnalyzer.Create(TAstUnitParser.Create(
-        Scope.SearchDirectories.ToArray, Logger), Logger, TConsoleProgress.Create);
+        Scope.SearchDirectories.ToArray, Logger, Scope.Defines.ToArray,
+        Scope.Platform), Logger, TConsoleProgress.Create);
       try
         Analysis := Analyzer.Run(Scope, Target);
         try

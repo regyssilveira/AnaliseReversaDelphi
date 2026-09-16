@@ -18,7 +18,7 @@ O executável usa `analysis-output` no diretório atual quando `--output` não �
 UnitBacktrace.exe --project "D:\MeuERP\MeuERP.dproj" --unit uExtrator --output "D:\Analise"
 ```
 
-O programa procura fontes recursivamente na pasta do projeto e avalia `DCC_UnitSearchPath` e `DCC_IncludePath` com o MSBuild do Delphi 13 para a configuração e plataforma selecionadas. Em uma máquina com Delphi 13, também lê o Search Path e o Browsing Path registrados na IDE para localizar fontes de bibliotecas. Os padrões vêm do `.dproj`; use `--platform Win32|Win64` e `--config Debug|Release` para selecioná-los. Se fontes de uma biblioteca estiverem fora desses caminhos, `--source-root DIR` acrescenta uma raiz recursiva; a opção pode ser repetida. Para analisar somente os caminhos do projeto, use `--no-global-path`.
+O programa procura fontes recursivamente na pasta do projeto e avalia `DCC_UnitSearchPath`, `DCC_IncludePath` e `DCC_Define` com o MSBuild do Delphi 13 para a configuração e plataforma selecionadas. Em uma máquina com Delphi 13, também lê o Search Path e o Browsing Path registrados na IDE para localizar fontes de bibliotecas. Os padrões vêm do `.dproj`; use `--platform Win32|Win64` e `--config Debug|Release` para selecioná-los. Se fontes de uma biblioteca estiverem fora desses caminhos, `--source-root DIR` acrescenta uma raiz recursiva; a opção pode ser repetida. Para analisar somente os caminhos do projeto, use `--no-global-path`.
 
 Uma raiz adicional amplia o escopo da análise; avisos de outras units da biblioteca também podem aparecer no log.
 
@@ -34,12 +34,14 @@ cd delphi-unit-backtrace
 .\tools\Build.ps1 -Platform Win64
 .\tools\Build.ps1 -Tests -Platform Win64
 .\bin\Win64\UnitBacktraceTests.exe
+.\bin\Win64\UnitBacktrace.exe --project .\tests\fixtures\Small\Small.dproj --unit Target --no-global-path --output .\bin\workflow-test
 node .\tests\Visual.Trace.test.js .\bin\workflow-test\graph.html
+node .\tests\Visual.Render.test.js .\bin\workflow-test\graph.html
 ```
 
-O script usa a instalação local `C:\Program Files (x86)\Embarcadero\Studio\37.0`. Para outro local, ajuste `$bdsRoot` em `tools/Build.ps1`. Os projetos `.dproj` também estão na raiz. DUnitX acompanha o RAD Studio 13; o DelphiAST é um submódulo Git. O teste opcional com Node.js verifica a lógica da cadeia no JavaScript gerado.
+O script detecta o Delphi 13 (BDS 37.0) pela variável de ambiente `BDS` ou pelo `RootDir` registrado em HKCU/HKLM e confirma que o compilador da plataforma existe. Os projetos `.dproj` também estão na raiz. DUnitX acompanha o RAD Studio 13; o DelphiAST é um submódulo Git. O teste opcional com Node.js verifica a lógica da cadeia no JavaScript gerado.
 
-O executável para testes locais fica em `bin\Win64\UnitBacktrace.exe`. A análise gera `result.txt`, `graph.dot`, `graph.html` e `analysis.log` na pasta indicada por `--output`. Abra `graph.html` no navegador para explorar o grafo sem instalar dependências. A busca lista até 30 units encontradas e centraliza a seleção. Ao selecionar um arquivo, o grafo destaca uma cadeia de declarações `uses` até o DPR; se não houver essa ligação, destaca uma cadeia até um arquivo do projeto. O painel mostra o arquivo e a linha de cada passo. Você pode isolar essa cadeia, ver apenas as ligações diretas ou mostrar todos os caminhos até o DPR. Uma cadeia destacada não prova que remover só uma declaração elimina a dependência: outras rotas podem continuar, e resultados parciais exigem conferir o log. O cabeçalho indica quando a análise é parcial.
+O executável para testes locais fica em `bin\Win64\UnitBacktrace.exe`. A análise gera `result.txt`, `graph.dot`, `graph.html` e `analysis.log` na pasta indicada por `--output`. Abra `graph.html` no navegador para explorar o grafo sem instalar dependências. A busca lista até 30 units encontradas e centraliza a seleção. Ao selecionar um arquivo, o grafo destaca uma cadeia de declarações `uses` até o DPR; se não houver essa ligação, destaca uma cadeia até um arquivo do projeto. O painel mostra o arquivo e a linha de cada passo. Você pode isolar essa cadeia, ver as ligações diretas ou mostrar todas as rotas resolvidas até o DPR. Outro painel lista os consumidores diretos da unit selecionada que participam dessas rotas como declarações a revisar para cortar a dependência naquele ponto. Referências ambíguas ou não resolvidas potencialmente ligadas ao alvo aparecem como incertas; outras ficam no log. Em grafos com mais de 250 arquivos, a abertura mostra os consumidores diretos e a seleção expande a exploração; o botão de grafo completo continua disponível. Uma cadeia destacada não prova que remover uma declaração elimina a dependência: outras rotas podem continuar, e resultados parciais exigem conferir o log.
 
 A saída elimina linhas exatamente iguais de caminhos e evidências, além de declarações de nós e ligações repetidas no DOT. Relações com arquivo, seção ou linha diferentes continuam separadas. Projetos com muitos ramos podem produzir milhares de caminhos distintos mesmo após essa limpeza; a lista textual mantém o limite de 10.000 caminhos, enquanto o grafo conserva as ligações alcançáveis.
 
@@ -64,7 +66,7 @@ O log UTF-8 registra `INFO`, `WARN`, `ERROR` e `DEBUG`, incluindo candidatos par
 
 ## Alcance atual
 
-Esta versão analisa dependências declaradas em `uses`. Ela não verifica se um símbolo da unit é realmente chamado. Se a avaliação MSBuild falhar, o log registra `msbuild-fallback` e a leitura textual dos caminhos pode incluir configurações não selecionadas; variáveis `$(...)` sem valor conhecido são sinalizadas. O teste sintético reproduzível possui 2.202 fontes distribuídos entre o projeto e três bibliotecas externas. Os testes DUnitX cobrem parser, fallback, includes, caminhos condicionais MSBuild, resolução de arquivos e namespaces, grafo e saída console.
+Esta versão analisa dependências declaradas em `uses`. Ela não verifica se um símbolo da unit é realmente chamado. O parser considera os símbolos condicionais do projeto e os símbolos Win32/Win64 da plataforma selecionada. Se a avaliação MSBuild falhar, o log registra `msbuild-fallback` e a leitura textual dos caminhos e símbolos pode incluir configurações não selecionadas; variáveis `$(...)` sem valor conhecido são sinalizadas. O teste sintético reproduzível possui 2.202 fontes distribuídos entre o projeto e três bibliotecas externas. Os testes DUnitX cobrem parser, fallback, includes, caminhos e símbolos condicionais MSBuild, resolução de arquivos e namespaces, grafo e saída console.
 
 ## Exemplo de saída
 

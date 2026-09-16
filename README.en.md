@@ -18,7 +18,7 @@ Without `--output`, files go to `analysis-output` in the current directory. Open
 UnitBacktrace.exe --project "D:\MyApp\MyApp.dproj" --unit uExtractor --output "D:\Analysis"
 ```
 
-It scans the project directory and evaluates `DCC_UnitSearchPath` and `DCC_IncludePath` through Delphi 13 MSBuild for the selected configuration and platform. It also reads the IDE's registered Search and Browsing Paths for library sources. Defaults come from the `.dproj`; use `--platform Win32|Win64` and `--config Debug|Release` to select them. If library sources are outside these paths, repeat `--source-root DIR` to add recursive source roots. `--no-global-path` limits the scope to project paths. It parses interface and implementation `uses` clauses with [DelphiAST](https://github.com/RomanYankovsky/DelphiAST), falls back to token extraction for unsupported syntax, and identifies nodes by resolved file path. Short unit names use the project's namespace order. Textual path enumeration stops at 10,000 paths to avoid combinatorial explosion; DOT retains every reachable edge.
+It scans the project directory and evaluates `DCC_UnitSearchPath`, `DCC_IncludePath`, and `DCC_Define` through Delphi 13 MSBuild for the selected configuration and platform. It also reads the IDE's registered Search and Browsing Paths for library sources. Defaults come from the `.dproj`; use `--platform Win32|Win64` and `--config Debug|Release` to select them. If library sources are outside these paths, repeat `--source-root DIR` to add recursive source roots. `--no-global-path` limits the scope to project paths. It parses interface and implementation `uses` clauses with [DelphiAST](https://github.com/RomanYankovsky/DelphiAST), falls back to token extraction for unsupported syntax, and identifies nodes by resolved file path. Short unit names use the project's namespace order. Textual path enumeration stops at 10,000 paths to avoid combinatorial explosion; DOT retains every reachable edge.
 
 An additional root broadens the analysis scope; warnings from other library units may also appear in the log.
 
@@ -32,12 +32,14 @@ cd delphi-unit-backtrace
 .\tools\Build.ps1 -Platform Win64
 .\tools\Build.ps1 -Tests -Platform Win64
 .\bin\Win64\UnitBacktraceTests.exe
+.\bin\Win64\UnitBacktrace.exe --project .\tests\fixtures\Small\Small.dproj --unit Target --no-global-path --output .\bin\workflow-test
 node .\tests\Visual.Trace.test.js .\bin\workflow-test\graph.html
+node .\tests\Visual.Render.test.js .\bin\workflow-test\graph.html
 ```
 
-The build script uses the local installation at `C:\Program Files (x86)\Embarcadero\Studio\37.0`. For another location, change `$bdsRoot` in `tools/Build.ps1`. DUnitX ships with RAD Studio 13; DelphiAST is a Git submodule. The optional Node.js test checks the generated JavaScript trace logic.
+The build script detects Delphi 13 (BDS 37.0) from the `BDS` environment variable or the registered `RootDir` in HKCU/HKLM, then checks that the compiler for the selected platform exists. DUnitX ships with RAD Studio 13; DelphiAST is a Git submodule. The optional Node.js test checks the generated JavaScript trace logic.
 
-The executable for local testing is `bin\Win64\UnitBacktrace.exe`. Each analysis writes `result.txt`, `graph.dot`, `graph.html`, and `analysis.log` to the directory selected by `--output`. Open `graph.html` in a browser to search and center a unit. Selecting a file highlights one chain of `uses` declarations to the DPR, or to a project file when the DPR is unreachable. The panel lists the source file and line for each step. You can isolate the chain, inspect direct neighbors, or show all paths reaching the DPR. One highlighted chain does not prove that removing a single declaration eliminates the dependency; other routes may remain, and partial results require log review. The HTML is self-contained and needs no installed graph renderer.
+The executable for local testing is `bin\Win64\UnitBacktrace.exe`. Each analysis writes `result.txt`, `graph.dot`, `graph.html`, and `analysis.log` to the directory selected by `--output`. Open `graph.html` in a browser to search and center a unit. Selecting a file highlights one chain of `uses` declarations to the DPR, or to a project file when the DPR is unreachable. The panel lists the source file and line for each step. You can isolate that chain, inspect direct neighbors, or show every resolved route reaching the DPR. Another panel lists the selected unit's direct consumers that participate in those routes as declarations to review before cutting the dependency. Potentially relevant ambiguous or unresolved references are marked uncertain; other warnings remain in the log. On graphs with more than 250 files, the initial view shows direct consumers and expands as files are selected; the full graph remains available. The HTML is self-contained and needs no installed graph renderer.
 
 Output generation removes exactly identical path and evidence lines, as well as duplicate DOT node and edge declarations. Dependencies with different files, sections, or source lines remain distinct. A large project can still have thousands of distinct reverse paths; the text listing is capped at 10,000 paths while the graph keeps reachable links.
 
@@ -49,7 +51,7 @@ The UTF-8 log records `INFO`, `WARN`, `ERROR`, and `DEBUG`: target candidates, e
 
 ## Current scope
 
-The current scope is declared `uses` dependencies. Unresolved and ambiguous references are logged and excluded from the graph. If MSBuild evaluation fails, `msbuild-fallback` is logged and textual path extraction may include other configurations; unknown `$(...)` path macros are logged for review. The reproducible synthetic fixture has 2,202 source files across a project and three external libraries. DUnitX tests cover parsing, fallback, includes, conditional MSBuild paths, file and namespace resolution, graph traversal, and console output.
+The current scope is declared `uses` dependencies, not proof of symbol usage. The parser applies project conditional symbols and the selected Win32/Win64 platform symbols. Unresolved and ambiguous references are logged and excluded from the resolved graph; potentially relevant ones are also listed in the HTML. If MSBuild evaluation fails, `msbuild-fallback` is logged and textual path and define extraction may include other configurations; unknown `$(...)` path macros are logged for review. The reproducible synthetic fixture has 2,202 source files across a project and three external libraries. DUnitX tests cover parsing, fallback, includes, conditional MSBuild paths and symbols, file and namespace resolution, graph traversal, and console output.
 
 ## Sample output
 

@@ -13,6 +13,7 @@ type
     FSeen: TDictionary<string, Boolean>;
     FSearchDirectories: TList<string>;
     FNamespaceOrder: TList<string>;
+    FDefines: TList<string>;
     FLogger: ILogger;
     FGlobalPaths: IGlobalSourcePathProvider;
     FRoot: string;
@@ -38,6 +39,7 @@ type
     property ProjectRoot: string read FRoot;
     property SearchDirectories: TList<string> read FSearchDirectories;
     property NamespaceOrder: TList<string> read FNamespaceOrder;
+    property Defines: TList<string> read FDefines;
     property Platform: string read FPlatform;
     property Config: string read FConfig;
     property PathEvaluationWasFallback: Boolean read FPathEvaluationWasFallback;
@@ -100,6 +102,10 @@ begin
   FFiles := TList<string>.Create;
   FSeen := TDictionary<string, Boolean>.Create;
   FNamespaceOrder := TList<string>.Create;
+  FDefines := TList<string>.Create;
+  if TRegEx.IsMatch(TFile.ReadAllText(FProgramFile),
+    '\{\$APPTYPE\s+CONSOLE\s*\}', [roIgnoreCase]) then
+    FDefines.Add('CONSOLE');
   FSearchDirectories := TList<string>.Create;
   FSearchDirectories.Add(FRoot);
   var NamespaceMatch := TRegEx.Match(ProjectText,
@@ -162,6 +168,7 @@ begin
   FFiles.Free;
   FSeen.Free;
   FNamespaceOrder.Free;
+  FDefines.Free;
   FSearchDirectories.Free;
   inherited;
 end;
@@ -187,7 +194,7 @@ var
   Text, Raw, Item, PathName, PathKind: string;
   Match: TMatch;
   Evaluated: Boolean;
-  UnitPaths, IncludePaths: TArray<string>;
+  UnitPaths, IncludePaths, Defines: TArray<string>;
   procedure AddPath(const Value, Kind: string);
   begin
     PathName := Trim(Value);
@@ -208,6 +215,17 @@ var
     end
     else FLogger.Write('WARN', 'search-path-missing', PathName);
   end;
+  procedure AddDefines(const Value: string);
+  var
+    RawSymbol, Symbol: string;
+  begin
+    for RawSymbol in Value.Split([';', ',']) do
+    begin
+      Symbol := Trim(RawSymbol);
+      if (Symbol <> '') and not Symbol.Contains('$(') and
+        not FDefines.Contains(Symbol) then FDefines.Add(Symbol);
+    end;
+  end;
 begin
   Text := TFile.ReadAllText(ProjectFile);
   Evaluated := False;
@@ -217,10 +235,13 @@ begin
         'DCC_UnitSearchPath');
       IncludePaths := FPathEvaluator.Evaluate(ProjectFile, FConfig, FPlatform,
         'DCC_IncludePath');
+      Defines := FPathEvaluator.Evaluate(ProjectFile, FConfig, FPlatform,
+        'DCC_Define');
       for Raw in UnitPaths do
         for Item in Raw.Split([';']) do AddPath(Item, 'UnitSearchPath');
       for Raw in IncludePaths do
         for Item in Raw.Split([';']) do AddPath(Item, 'IncludePath');
+      for Raw in Defines do AddDefines(Raw);
       Evaluated := True;
     except
       on E: Exception do
@@ -237,7 +258,11 @@ begin
     Raw := Match.Groups[2].Value.Replace('&amp;', '&');
     for Item in Raw.Split([';']) do AddPath(Item, PathKind);
   end;
+    for Match in TRegEx.Matches(Text, '<DCC_Define>(.*?)</DCC_Define>',
+      [roIgnoreCase, roSingleLine]) do AddDefines(Match.Groups[1].Value);
   end;
+  FLogger.Write('INFO', 'conditional-defines',
+    Format('%d project symbols | %s | %s', [FDefines.Count, FPlatform, FConfig]));
   for Match in TRegEx.Matches(Text, '<DCCReference\s+Include="(.*?)"',
     [roIgnoreCase, roSingleLine]) do
   begin

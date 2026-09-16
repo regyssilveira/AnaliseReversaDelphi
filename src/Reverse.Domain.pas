@@ -23,6 +23,11 @@ type
     Path: string;
   end;
 
+  TUncertainReference = record
+    Dependency: TDependency;
+    Reason: string;
+  end;
+
   IUnitParser = interface
     ['{641C73C6-AD76-4E05-9AC7-D0FDD275508C}']
     function Parse(const FileName: string; Dependencies: TList<TDependency>): string;

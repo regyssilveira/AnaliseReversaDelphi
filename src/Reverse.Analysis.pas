@@ -18,6 +18,7 @@ type
     Graph: TReverseGraph;
     Reachable: TArray<TDependency>;
     Paths: TArray<string>;
+    Uncertain: TArray<TUncertainReference>;
     ParsedCount: Integer;
     FailedCount: Integer;
     FallbackCount: Integer;
@@ -80,6 +81,14 @@ var
   DotPos: Integer;
   Stopwatch: TStopwatch;
   NamespaceName, ChosenAlias: string;
+  Uncertain: TList<TUncertainReference>;
+  Warning: TUncertainReference;
+  procedure MarkUncertain(const Reason: string);
+  begin
+    Warning.Dependency := Edge;
+    Warning.Reason := Reason;
+    Uncertain.Add(Warning);
+  end;
 begin
   Stopwatch := TStopwatch.StartNew;
   Result := TAnalysisResult.Create;
@@ -88,6 +97,7 @@ begin
   Result.PathEvaluationWasFallback := Scope.PathEvaluationWasFallback;
   Edges := TList<TDependency>.Create;
   Pending := TList<TDependency>.Create;
+  Uncertain := TList<TUncertainReference>.Create;
   Known := TObjectDictionary<string, TList<string>>.Create([doOwnsValues]);
   Aliases := TObjectDictionary<string, TList<string>>.Create([doOwnsValues]);
   try
@@ -165,6 +175,7 @@ begin
           Inc(Result.UnresolvedCount);
           FLogger.Write('WARN', 'declared-path-missing', Edge.UsedName +
             ' | ' + DeclaredFile);
+          MarkUncertain('declared-path-missing');
           Continue;
         end;
         Edge.UsedPath := DeclaredFile;
@@ -177,6 +188,7 @@ begin
           FLogger.Write('WARN', 'ambiguous-reference', Edge.SourceFile + ':' +
             Edge.Line.ToString + ' | ' + Edge.UsedName + ' | ' +
             String.Join('; ', Candidates.ToArray));
+          MarkUncertain('ambiguous-reference');
           Continue;
         end;
         Edge.UsedPath := Candidates[0];
@@ -210,6 +222,7 @@ begin
           FLogger.Write('WARN', 'ambiguous-namespace', Edge.SourceFile + ':' +
             Edge.Line.ToString + ' | ' + Edge.UsedName + ' | ' +
             String.Join('; ', AliasNames.ToArray));
+          MarkUncertain('ambiguous-namespace');
           Continue;
         end;
         FullName := ChosenAlias;
@@ -218,6 +231,7 @@ begin
         begin
           Inc(Result.AmbiguousCount);
           FLogger.Write('WARN', 'ambiguous-namespace-file', FullName);
+          MarkUncertain('ambiguous-namespace-file');
           Continue;
         end;
         Edge.UsedPath := Candidates[0];
@@ -229,6 +243,7 @@ begin
         Inc(Result.UnresolvedCount);
         FLogger.Write('WARN', 'unresolved-reference', Edge.SourceFile + ':' +
           Edge.Line.ToString + ' | ' + Edge.UsedName);
+        MarkUncertain('unresolved-reference');
         Continue;
       end;
       Result.Graph.Add(Edge);
@@ -238,6 +253,7 @@ begin
     if FProgress <> nil then FProgress.Report('Resolvendo dependencias', Pending.Count, Pending.Count);
     if FProgress <> nil then FProgress.Report('Montando grafo reverso', 0, 0);
     Result.Reachable := Result.Graph.Reachable(Result.TargetFile);
+    Result.Uncertain := Uncertain.ToArray;
     Result.Paths := Result.Graph.Paths(Result.TargetFile, Scope.ProgramFile);
     if FProgress <> nil then FProgress.Report('Montando grafo reverso', 1, 1);
     FLogger.Write('INFO', 'complete', Format('%d parsed; %d fallback; %d failed; %d unresolved; %d ambiguous; %d reachable edges; %d ms',
@@ -251,6 +267,7 @@ begin
     Aliases.Free;
     Known.Free;
     Pending.Free;
+    Uncertain.Free;
     Edges.Free;
   end;
 end;
