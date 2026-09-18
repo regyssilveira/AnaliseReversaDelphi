@@ -86,8 +86,8 @@ const folderEntries = folderTree.children.filter(x => x.tag === 'details');
 assert.equal(folderEntries.length, folderCount,
   'sidebar lists every reachable folder');
 assert.equal(folderEntries.reduce((total, entry) => total +
-  entry.children.filter(x => x.tag === 'button').length, 0), fileCount,
-  'folder tree lists every reachable file');
+  entry.children.filter(x => x.tag === 'button').length, 0), 0,
+  'folder tree defers file elements until a folder is expanded');
 assert.match(document.getElementById('folderSummary').children[0].textContent,
   new RegExp(`Resumo: ${folderCount} pastas únicas, ${fileCount} arquivos`));
 assert.equal(document.getElementById('folderSummary').children[1].children.length,
@@ -103,18 +103,38 @@ if (!openedUnits) {
   assert.ok(graphNodes().length > 0, 'returning from a folder keeps the graph navigable');
 }
 document.getElementById('folderMode').click();
-folderEntries[0].children.find(x => x.tag === 'button').click();
+folderEntries[0].open = true;
+folderEntries[0].ontoggle();
+const loadedButtons = folderEntries[0].children.filter(x => x.tag === 'button');
+assert.ok(loadedButtons.length > 1,
+  'expanding a folder loads its navigation button and files on demand');
+loadedButtons[0].click();
+assert.ok(document.getElementById('unitMode').classes.has('active'),
+  'opening a physical folder switches to unit mode');
+assert.equal(document.getElementById('folderBack').disabled, false,
+  'opening a physical folder keeps a return path');
+document.getElementById('folderBack').click();
+loadedButtons[1].click();
 assert.ok(document.getElementById('unitMode').classes.has('active'),
   'selecting a file switches to unit mode');
 assert.ok(document.getElementById('detail').textContent.includes('Pasta:'),
   'selecting a file exposes its path and folder');
+document.getElementById('folderBack').click();
+document.getElementById('folderMode').click();
 document.getElementById('search').value = '';
 document.getElementById('search').oninput();
 document.getElementById('unitMode').click();
-assert.equal(graphNodes().length, fileCount,
-  'unit mode shows every reachable file');
-assert.equal(document.getElementById('status').textContent,
-  `${fileCount} arquivo(s) | ${relationCount} relação(ões)`);
+if (fileCount <= 1000) {
+  assert.equal(graphNodes().length, fileCount,
+    'unit mode shows every reachable file in a manageable map');
+  assert.equal(document.getElementById('status').textContent,
+    `${fileCount} arquivo(s) | ${relationCount} relação(ões)`);
+} else {
+  assert.ok(document.getElementById('folderMode').classes.has('active'),
+    'large maps stay grouped until a folder is selected');
+  assert.match(document.getElementById('detail').textContent,
+    /Selecione primeiro uma pasta/);
+}
 document.getElementById('folderMode').click();
 assert.equal(graphNodes().length, initialGroupCount, 'grouped folder mode can be restored');
 const multiFolderGroup = graphNodes().find(node => node.children.some(child =>

@@ -14,6 +14,8 @@ D:\Ferramentas\UnitBacktrace.exe --project MeuERP.dproj
 
 Esse comando gera o mapa completo das dependências alcançáveis a partir do DPR. Para o backtrace de uma unit específica:
 
+No mapa do projeto, a visão inicial agrupa os arquivos por diretório. Clique nos blocos para avançar pela hierarquia. O botão fixo **Voltar para o nível anterior** restaura a pasta, o nível de agrupamento e a visão anteriores, inclusive depois de abrir as units de uma pasta. A lista lateral carrega os arquivos somente quando uma pasta é expandida, para manter projetos grandes responsivos.
+
 ```powershell
 D:\Ferramentas\UnitBacktrace.exe --project MeuERP.dproj --unit uExtrator
 ```
