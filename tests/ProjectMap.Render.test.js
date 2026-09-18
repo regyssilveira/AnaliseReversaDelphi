@@ -151,4 +151,9 @@ document.getElementById('folderDepth').value = 'all';
 document.getElementById('folderDepth').onchange();
 assert.equal(graphNodes().length, folderCount,
   'complete path mode restores every physical folder');
+document.getElementById('folderMode').click();
+assert.equal(document.getElementById('folderDepth').value, '1',
+  'folder overview returns to the first hierarchy level');
+assert.equal(graphNodes().length, initialGroupCount,
+  'folder overview regroups src and other parent directories');
 console.log('Project map render tests passed');

@@ -691,7 +691,7 @@ begin
         'Mapa de depend' + #$00EA + 'ncias do projeto'));
       Assert.IsTrue(TFile.ReadAllText(TPath.GetFullPath(
         'bin\project-map-output\graph.html')).Contains(
-        '>Pastas</button>'));
+        '>Pastas (vis' + #$00E3 + 'o geral)</button>'));
       Assert.IsTrue(TFile.ReadAllText(TPath.GetFullPath(
         'bin\project-map-output\graph.html')).Contains(
         '>Units</button>'));

@@ -14,7 +14,7 @@ D:\Tools\UnitBacktrace.exe --project MyApp.dproj
 
 This creates the complete map of dependencies reachable from the DPR. For a specific unit backtrace:
 
-The project map initially groups files by directory. Click graph nodes to move through the hierarchy. The sticky **Back to previous level** button restores the previous folder, grouping depth, and view, including after opening a folder's units. The sidebar loads files only when a folder is expanded so large projects remain responsive.
+The project map initially groups files by their first directory, keeping branches such as `src` together. Click graph nodes to expand only the selected branch. **Folders (overview)** always returns to the first level; the sticky **Back to previous level** button restores the previous folder, grouping depth, and view, including after opening a folder's units. The sidebar loads files only when a folder is expanded so large projects remain responsive.
 
 ```powershell
 D:\Tools\UnitBacktrace.exe --project MyApp.dproj --unit uExtractor
