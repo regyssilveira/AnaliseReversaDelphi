@@ -44,6 +44,10 @@ const document = {
     if (!elements.has(id)) {
       const element = new Element(id);
       if (id === 'section') element.value = 'all';
+      if (id === 'folderSummary') {
+        element.appendChild(new Element('summary'));
+        element.appendChild(new Element('ul'));
+      }
       elements.set(id, element);
     }
     return elements.get(id);
@@ -68,6 +72,14 @@ assert.equal(folderEntries.length, folderCount,
 assert.equal(folderEntries.reduce((total, entry) => total +
   entry.children.filter(x => x.tag === 'button').length, 0), fileCount,
   'folder tree lists every reachable file');
+assert.match(document.getElementById('folderSummary').children[0].textContent,
+  new RegExp(`Resumo: ${folderCount} pastas únicas, ${fileCount} arquivos`));
+assert.equal(document.getElementById('folderSummary').children[1].children.length,
+  folderCount, 'folder summary lists each folder exactly once');
+graphNodes()[0].click();
+assert.ok(document.getElementById('unitMode').classes.has('active'),
+  'clicking a folder in the graph opens its units');
+document.getElementById('folderMode').click();
 folderEntries[0].children.find(x => x.tag === 'button').click();
 assert.ok(document.getElementById('unitMode').classes.has('active'),
   'selecting a file switches to unit mode');
