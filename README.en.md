@@ -2,6 +2,8 @@
 
 [Portuguese README](README.md)
 
+[Roadmap to version 1.0 (Portuguese)](ROADMAP.md)
+
 Console tool that maps **everything a Delphi project uses from its DPR** or answers **which files use a selected unit and through which paths it reaches the project**. Only the `.dproj` is required; `--unit` selects backtrace mode. Outputs are a report in `result.txt`, a navigable graph in `graph.html`, links in `graph.dot`, and analysis decisions in `analysis.log`.
 
 ## Download and run

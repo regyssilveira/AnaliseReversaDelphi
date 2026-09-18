@@ -2,6 +2,8 @@
 
 [README em inglês](README.en.md)
 
+[Roadmap até a versão 1.0](ROADMAP.md)
+
 Ferramenta console para mapear **tudo que um projeto Delphi usa a partir do DPR** ou responder **quem usa uma unit e por quais caminhos ela chega ao projeto**. Somente o `.dproj` é obrigatório; `--unit` seleciona o modo de backtrace. O resultado contém um relatório em `result.txt`, um grafo navegável em `graph.html`, as ligações em `graph.dot` e decisões de análise em `analysis.log`.
 
 ## Baixar e executar
