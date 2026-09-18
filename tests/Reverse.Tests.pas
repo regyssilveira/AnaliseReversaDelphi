@@ -638,6 +638,23 @@ begin
       Assert.AreEqual(NativeInt(5), Length(Analysis.Reachable));
       Assert.AreEqual(NativeInt(0), Length(Analysis.Routes));
       Assert.AreEqual(NativeInt(0), Length(Analysis.Paths));
+      TOutputWriter.WriteFiles(Analysis, TPath.GetFullPath(
+        'bin\project-map-output'));
+      Assert.IsTrue(TFile.ReadAllText(TPath.GetFullPath(
+        'bin\project-map-output\result.txt')).Contains(
+        'Dependencies reachable from the project entry'));
+      Assert.IsTrue(TFile.ReadAllText(TPath.GetFullPath(
+        'bin\project-map-output\graph.dot')).Contains(
+        'Small.dpr" -> "'));
+      Assert.IsTrue(TFile.ReadAllText(TPath.GetFullPath(
+        'bin\project-map-output\graph.html')).Contains(
+        'Mapa de depend' + #$00EA + 'ncias do projeto'));
+      Assert.IsTrue(TFile.ReadAllText(TPath.GetFullPath(
+        'bin\project-map-output\graph.html')).Contains(
+        '>Pastas</button>'));
+      Assert.IsTrue(TFile.ReadAllText(TPath.GetFullPath(
+        'bin\project-map-output\graph.html')).Contains(
+        '>Units</button>'));
     finally
       Analysis.Free;
     end;

@@ -17,7 +17,7 @@ implementation
 
 uses System.SysUtils, System.IOUtils, System.Classes,
   System.Generics.Collections, Reverse.Domain,
-  Reverse.Visual;
+  Reverse.Visual, Reverse.ProjectMapVisual;
 
 function DotQuote(const Value: string): string;
 begin
@@ -40,32 +40,43 @@ begin
   SeenEvidence := TDictionary<string, Boolean>.Create;
   SeenDot := TDictionary<string, Boolean>.Create;
   try
-    Report.Add('Target: ' + Result.TargetName + ' | ' + Result.TargetFile);
-    Report.Add('Project entry: ' + Result.ProgramName);
+    if Result.Mode = amProjectMap then
+      Report.Add('Project map: ' + Result.ProgramName + ' | ' + Result.ProgramFile)
+    else
+      Report.Add('Target: ' + Result.TargetName + ' | ' + Result.TargetFile);
+    Report.Add('Project entry: ' + Result.ProgramName + ' | ' + Result.ProgramFile);
     Report.Add(Format('Parsed: %d | AST fallback: %d | Failed: %d | Unresolved: %d | Ambiguous: %d | Reachable edges: %d',
       [Result.ParsedCount, Result.FallbackCount, Result.FailedCount, Result.UnresolvedCount,
        Result.AmbiguousCount, Length(Result.Reachable)]));
-    Report.Add(Format('Routes: DPR %d | Project %d | Library %d | No consumer %d | Cycles %d',
-      [Result.RouteCount(rdDpr), Result.RouteCount(rdProjectFile),
-       Result.RouteCount(rdLibraryRoot), Result.RouteCount(rdNoConsumer),
-       Result.RouteCount(rdCycle)]));
+    if Result.Mode = amUnitBacktrace then
+      Report.Add(Format('Routes: DPR %d | Project %d | Library %d | No consumer %d | Cycles %d',
+        [Result.RouteCount(rdDpr), Result.RouteCount(rdProjectFile),
+         Result.RouteCount(rdLibraryRoot), Result.RouteCount(rdNoConsumer),
+         Result.RouteCount(rdCycle)]));
     if Result.PathEvaluationWasFallback then
       Report.Add('Project path evaluation: MSBuild fallback; verify configuration-specific paths in analysis.log');
     Report.Add('');
-    Report.Add('Reverse paths:');
-    for Path in Result.Paths do
-      if not SeenPaths.ContainsKey(Path) then
-      begin
-        SeenPaths.Add(Path, True);
-        Report.Add(Path);
-      end;
+    if Result.Mode = amUnitBacktrace then
+    begin
+      Report.Add('Reverse paths:');
+      for Path in Result.Paths do
+        if not SeenPaths.ContainsKey(Path) then
+        begin
+          SeenPaths.Add(Path, True);
+          Report.Add(Path);
+        end;
+    end
+    else Report.Add('Dependencies reachable from the project entry:');
     Report.Add('');
     Report.Add('Evidence:');
     Dot.Add('digraph UnitBacktrace {');
     Dot.Add('  rankdir=LR;');
     for Edge in Result.Reachable do
     begin
-      Evidence := Edge.UsedName + ' -> ' + Edge.Consumer + ' | ' +
+      if Result.Mode = amProjectMap then
+        Evidence := Edge.Consumer + ' -> ' + Edge.UsedName + ' | '
+      else Evidence := Edge.UsedName + ' -> ' + Edge.Consumer + ' | ';
+      Evidence := Evidence +
         Edge.Section + ' | ' + Edge.SourceFile + ':' + Edge.Line.ToString +
         ' | used file: ' + Edge.UsedPath;
       if not SeenEvidence.ContainsKey(Evidence) then
@@ -87,9 +98,14 @@ begin
         SeenDot.Add(DotLine, True);
         Dot.Add(DotLine);
       end;
-      DotLine := '  ' + DotQuote(Edge.UsedPath) + ' -> ' +
-        DotQuote(Edge.ConsumerPath) + ' [label=' +
-        DotQuote(Edge.Section + ':' + Edge.Line.ToString) + '];';
+      if Result.Mode = amProjectMap then
+        DotLine := '  ' + DotQuote(Edge.ConsumerPath) + ' -> ' +
+          DotQuote(Edge.UsedPath) + ' [label=' +
+          DotQuote(Edge.Section + ':' + Edge.Line.ToString) + '];'
+      else
+        DotLine := '  ' + DotQuote(Edge.UsedPath) + ' -> ' +
+          DotQuote(Edge.ConsumerPath) + ' [label=' +
+          DotQuote(Edge.Section + ':' + Edge.Line.ToString) + '];';
       if not SeenDot.ContainsKey(DotLine) then
       begin
         SeenDot.Add(DotLine, True);
@@ -99,8 +115,12 @@ begin
     Dot.Add('}');
     Report.SaveToFile(TPath.Combine(OutputDirectory, 'result.txt'), TEncoding.UTF8);
     Dot.SaveToFile(TPath.Combine(OutputDirectory, 'graph.dot'), TEncoding.UTF8);
-    TVisualWriter.WriteHtml(Result,
-      TPath.Combine(OutputDirectory, 'graph.html'));
+    if Result.Mode = amProjectMap then
+      TProjectMapVisualWriter.WriteHtml(Result,
+        TPath.Combine(OutputDirectory, 'graph.html'))
+    else
+      TVisualWriter.WriteHtml(Result,
+        TPath.Combine(OutputDirectory, 'graph.html'));
   finally
     SeenDot.Free;
     SeenEvidence.Free;
