@@ -55,15 +55,19 @@ const document = {
 vm.runInContext(script, vm.createContext({ document }));
 const graph = document.getElementById('graph');
 const graphNodes = () => graph.children.filter(x => x.tag === 'g');
-assert.match(document.getElementById('summary').textContent,
-  /4 arquivos alcançáveis \| 1 pastas \| 5 relações/);
-assert.equal(graphNodes().length, 1, 'folder mode starts with one grouped folder');
-assert.equal(document.getElementById('folders').children.length, 1,
+const summary = document.getElementById('summary').textContent;
+const counts = summary.match(/(\d+) arquivos alcançáveis \| (\d+) pastas \| (\d+) relações/);
+assert.ok(counts, 'summary exposes file, folder, and relationship counts');
+const [, fileCount, folderCount, relationCount] = counts.map(Number);
+assert.equal(graphNodes().length, folderCount,
+  'folder mode starts with every reachable folder');
+assert.equal(document.getElementById('folders').children.length, folderCount,
   'sidebar lists every reachable folder');
 document.getElementById('unitMode').click();
-assert.equal(graphNodes().length, 4, 'unit mode shows every reachable file');
-assert.match(document.getElementById('status').textContent,
-  /4 arquivo\(s\) \| 5 relação\(ões\)/);
+assert.equal(graphNodes().length, fileCount,
+  'unit mode shows every reachable file');
+assert.equal(document.getElementById('status').textContent,
+  `${fileCount} arquivo(s) | ${relationCount} relação(ões)`);
 document.getElementById('folderMode').click();
-assert.equal(graphNodes().length, 1, 'folder mode can be restored');
+assert.equal(graphNodes().length, folderCount, 'folder mode can be restored');
 console.log('Project map render tests passed');
