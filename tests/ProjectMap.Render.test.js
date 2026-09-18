@@ -44,6 +44,12 @@ const document = {
     if (!elements.has(id)) {
       const element = new Element(id);
       if (id === 'section') element.value = 'all';
+      if (id === 'folderDepth') {
+        element.value = '1';
+        const option = new Element('option');
+        option.value = '1';
+        element.appendChild(option);
+      }
       if (id === 'folderSummary') {
         element.appendChild(new Element('summary'));
         element.appendChild(new Element('ul'));
@@ -59,12 +65,22 @@ const document = {
 vm.runInContext(script, vm.createContext({ document }));
 const graph = document.getElementById('graph');
 const graphNodes = () => graph.children.filter(x => x.tag === 'g');
+const depthOptions = document.getElementById('folderDepth').children;
+assert.ok(depthOptions.length >= 2,
+  'folder grouping offers every discovered level and the full path');
+for (let index = 0; index < depthOptions.length - 1; index++)
+  assert.equal(depthOptions[index].value, String(index + 1),
+    'folder levels are consecutive and adapt to the project depth');
+assert.equal(depthOptions.at(-1).value, 'all');
 const summary = document.getElementById('summary').textContent;
 const counts = summary.match(/(\d+) arquivos alcançáveis \| (\d+) pastas \| (\d+) relações/);
 assert.ok(counts, 'summary exposes file, folder, and relationship counts');
 const [, fileCount, folderCount, relationCount] = counts.map(Number);
-assert.equal(graphNodes().length, folderCount,
-  'folder mode starts with every reachable folder');
+const initialGroupCount = Number(document.getElementById('status').textContent
+  .match(/(\d+) pasta\(s\)/)?.[1] || 0);
+assert.ok(initialGroupCount > 0 && initialGroupCount <= folderCount,
+  'folder mode groups physical directories at the selected depth');
+assert.equal(graphNodes().length, initialGroupCount);
 const folderTree = document.getElementById('folders');
 const folderEntries = folderTree.children.filter(x => x.tag === 'details');
 assert.equal(folderEntries.length, folderCount,
@@ -93,5 +109,9 @@ assert.equal(graphNodes().length, fileCount,
 assert.equal(document.getElementById('status').textContent,
   `${fileCount} arquivo(s) | ${relationCount} relação(ões)`);
 document.getElementById('folderMode').click();
-assert.equal(graphNodes().length, folderCount, 'folder mode can be restored');
+assert.equal(graphNodes().length, initialGroupCount, 'grouped folder mode can be restored');
+document.getElementById('folderDepth').value = 'all';
+document.getElementById('folderDepth').onchange();
+assert.equal(graphNodes().length, folderCount,
+  'complete path mode restores every physical folder');
 console.log('Project map render tests passed');
