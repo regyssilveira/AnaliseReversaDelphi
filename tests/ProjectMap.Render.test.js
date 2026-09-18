@@ -61,8 +61,20 @@ assert.ok(counts, 'summary exposes file, folder, and relationship counts');
 const [, fileCount, folderCount, relationCount] = counts.map(Number);
 assert.equal(graphNodes().length, folderCount,
   'folder mode starts with every reachable folder');
-assert.equal(document.getElementById('folders').children.length, folderCount,
+const folderTree = document.getElementById('folders');
+const folderEntries = folderTree.children.filter(x => x.tag === 'details');
+assert.equal(folderEntries.length, folderCount,
   'sidebar lists every reachable folder');
+assert.equal(folderEntries.reduce((total, entry) => total +
+  entry.children.filter(x => x.tag === 'button').length, 0), fileCount,
+  'folder tree lists every reachable file');
+folderEntries[0].children.find(x => x.tag === 'button').click();
+assert.ok(document.getElementById('unitMode').classes.has('active'),
+  'selecting a file switches to unit mode');
+assert.ok(document.getElementById('detail').textContent.includes('Pasta:'),
+  'selecting a file exposes its path and folder');
+document.getElementById('search').value = '';
+document.getElementById('search').oninput();
 document.getElementById('unitMode').click();
 assert.equal(graphNodes().length, fileCount,
   'unit mode shows every reachable file');
