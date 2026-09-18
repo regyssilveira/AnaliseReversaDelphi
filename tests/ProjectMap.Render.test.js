@@ -93,8 +93,15 @@ assert.match(document.getElementById('folderSummary').children[0].textContent,
 assert.equal(document.getElementById('folderSummary').children[1].children.length,
   folderCount, 'folder summary lists each folder exactly once');
 graphNodes()[0].click();
-assert.ok(document.getElementById('unitMode').classes.has('active'),
-  'clicking a folder in the graph opens its units');
+const openedUnits = document.getElementById('unitMode').classes.has('active');
+assert.ok(openedUnits || document.getElementById('folderMode').classes.has('active'),
+  'clicking a folder opens its units or drills into the next folder level');
+if (!openedUnits) {
+  assert.equal(document.getElementById('folderBack').disabled, false,
+    'drill-down enables navigation to the previous level');
+  document.getElementById('folderBack').click();
+  assert.ok(graphNodes().length > 0, 'returning from a folder keeps the graph navigable');
+}
 document.getElementById('folderMode').click();
 folderEntries[0].children.find(x => x.tag === 'button').click();
 assert.ok(document.getElementById('unitMode').classes.has('active'),
@@ -110,6 +117,16 @@ assert.equal(document.getElementById('status').textContent,
   `${fileCount} arquivo(s) | ${relationCount} relação(ões)`);
 document.getElementById('folderMode').click();
 assert.equal(graphNodes().length, initialGroupCount, 'grouped folder mode can be restored');
+const multiFolderGroup = graphNodes().find(node => node.children.some(child =>
+  child.tag === 'text' && /• ([2-9]|\d{2,}) pasta\(s\)/.test(child.textContent || '')));
+if (multiFolderGroup) {
+  multiFolderGroup.click();
+  assert.ok(document.getElementById('folderMode').classes.has('active'),
+    'a group with subfolders drills down without rendering all units');
+  assert.equal(document.getElementById('folderBack').disabled, false);
+  assert.ok(graphNodes().length > 0, 'the next directory level is visible');
+  document.getElementById('folderBack').click();
+}
 document.getElementById('folderDepth').value = 'all';
 document.getElementById('folderDepth').onchange();
 assert.equal(graphNodes().length, folderCount,
