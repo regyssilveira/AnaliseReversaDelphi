@@ -2,17 +2,23 @@
 
 [Portuguese README](README.md)
 
-Console tool answering **which Delphi units use a selected unit, and through which paths it reaches the DPR**. Only a `.dproj` file and the unit name are required; the program finds the `.pas` file. Outputs are reverse paths in `result.txt`, a navigable graph in `graph.html`, links in `graph.dot`, and analysis decisions in `analysis.log`.
+Console tool that maps **everything a Delphi project uses from its DPR** or answers **which files use a selected unit and through which paths it reaches the project**. Only the `.dproj` is required; `--unit` selects backtrace mode. Outputs are a report in `result.txt`, a navigable graph in `graph.html`, links in `graph.dot`, and analysis decisions in `analysis.log`.
 
 ## Download and run
 
 Download the Win64 or Win32 ZIP from the [latest release page](https://github.com/regyssilveira/delphi-unit-backtrace/releases/latest) and extract it. From the project directory, run:
 
 ```powershell
+D:\Tools\UnitBacktrace.exe --project MyApp.dproj
+```
+
+This creates the complete map of dependencies reachable from the DPR. For a specific unit backtrace:
+
+```powershell
 D:\Tools\UnitBacktrace.exe --project MyApp.dproj --unit uExtractor
 ```
 
-Without `--output`, files go to `analysis-output\<project>-<identifier>\<unit>` in the current directory, such as `analysis-output\MyApp-a1b2c3d4\uExtractor\graph.html`. The identifier derives from the `.dproj` path, so projects with the same name in different folders stay separate. An explicit `--output` uses the exact requested folder. If the analysis is partial (exit code `3`), review `analysis.log` before changing `uses` declarations. The ZIP includes third-party licenses and notices.
+Without `--output`, the map goes to `analysis-output\<project>-<identifier>\project-map`; a backtrace goes to `analysis-output\<project>-<identifier>\<unit>`. The identifier derives from the `.dproj` path, so projects with the same name in different folders stay separate. An explicit `--output` uses the requested folder. If analysis is partial (exit code `3`), review `analysis.log`. The ZIP includes third-party licenses and notices.
 
 ```powershell
 UnitBacktrace.exe --project "D:\MyApp\MyApp.dproj" --unit uExtractor --output "D:\Analysis"
@@ -32,6 +38,8 @@ cd delphi-unit-backtrace
 .\tools\Build.ps1 -Platform Win64
 .\tools\Build.ps1 -Tests -Platform Win64
 .\bin\Win64\UnitBacktraceTests.exe
+.\bin\Win64\UnitBacktrace.exe --project .\tests\fixtures\Small\Small.dproj --no-global-path --output .\bin\project-map-output
+node .\tests\ProjectMap.Render.test.js .\bin\project-map-output\graph.html
 .\bin\Win64\UnitBacktrace.exe --project .\tests\fixtures\Small\Small.dproj --unit Target --no-global-path --output .\bin\workflow-test
 node .\tests\Visual.Trace.test.js .\bin\workflow-test\graph.html
 node .\tests\Visual.Render.test.js .\bin\workflow-test\graph.html
@@ -40,6 +48,8 @@ node .\tests\Visual.Render.test.js .\bin\workflow-test\graph.html
 The build script detects Delphi 13 (BDS 37.0) from the `BDS` environment variable or the registered `RootDir` in HKCU/HKLM, then checks that the compiler for the selected platform exists. DUnitX ships with RAD Studio 13; DelphiAST is a Git submodule. The optional Node.js test checks the generated JavaScript trace logic.
 
 The executable for local testing is `bin\Win64\UnitBacktrace.exe`. Each analysis writes `result.txt`, `graph.dot`, `graph.html`, and `analysis.log` to the output directory. Open `graph.html` in a browser to search and center a unit. Selecting a file highlights one chain of `uses` declarations to the DPR, or to a project file when the DPR is unreachable. Previous and Next navigate every declaration in the chain without a step limit; Copy file:line copies the selected declaration. You can isolate the chain, inspect direct neighbors, or show every resolved route reaching the DPR. Zoom, fit chain or visible graph, pointer dragging, and the visual section filter make larger graphs easier to inspect.
+
+In the default mode, without `--unit`, analysis starts at the DPR and includes only files actually reachable through `uses` declarations, including files found through Search Paths or `--source-root`. The HTML opens in the **Folders** view, aggregates the number of relationships between directories, and can switch to **Units**. Search accepts folders, units, or full paths, the filter separates DPR, `interface`, and `implementation`, and selecting a folder lists its files with full paths.
 
 The graph opens in progressive mode with the target unit and its direct consumers. At the top, **Progressive view** restores this clean view and **Full graph** shows every file so you can start with the complete set and reduce it with search, filters, hidden branches, or isolated routes. The route list groups chains by DPR, project, library, missing consumer, and cycle; selecting an entry isolates that chain. Branch controls expand the next level, expand to the DPR or terminal, collapse, and hide a branch. Double-click isolates a unit route, while pointer hover highlights its chain and fades unrelated links. The layout repeatedly orders nodes by their neighbors to reduce crossings and places the DPR, final project files, and library roots in a common destination column.
 

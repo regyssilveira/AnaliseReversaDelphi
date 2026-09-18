@@ -50,7 +50,9 @@ type
   TConsoleTests = class
   public
     [Test] procedure SeparatesDefaultOutputByProjectAndUnit;
+    [Test] procedure UsesDedicatedProjectMapOutputDirectory;
     [Test] procedure SummarizesOnlyDirectConsumersThatReachDpr;
+    [Test] procedure SummarizesProjectMap;
   end;
 
   [TestFixture]
@@ -163,6 +165,17 @@ begin
   Assert.IsFalse(Output.Contains('..\'));
 end;
 
+procedure TConsoleTests.UsesDedicatedProjectMapOutputDirectory;
+var
+  Output: string;
+begin
+  Output := TConsoleReport.DefaultProjectMapOutputDirectory(
+    TPath.GetFullPath('bin\console-output-test'),
+    'D:\Projects\Small.dproj');
+  Assert.IsTrue(TRegEx.IsMatch(Output,
+    'analysis-output\\Small-[0-9a-fA-F]{8}\\project-map$'));
+end;
+
 procedure TConsoleTests.SummarizesOnlyDirectConsumersThatReachDpr;
 var
   Analysis: TAnalysisResult;
@@ -193,6 +206,33 @@ begin
     Assert.IsTrue(Lines[1].Contains('Caminho ate o DPR: sim'));
     Assert.IsTrue(Lines[2].Contains('Rotas:'));
     Assert.IsTrue(Lines[3].Contains('1 nao resolvidas'));
+  finally
+    Analysis.Free;
+  end;
+end;
+
+procedure TConsoleTests.SummarizesProjectMap;
+var
+  Analysis: TAnalysisResult;
+  Edges: TArray<TDependency>;
+  Lines: TArray<string>;
+begin
+  Analysis := TAnalysisResult.Create;
+  try
+    Analysis.Mode := amProjectMap;
+    Analysis.ProgramFile := 'C:\Project\App.dpr';
+    SetLength(Edges, 2);
+    Edges[0].ConsumerPath := Analysis.ProgramFile;
+    Edges[0].UsedPath := 'C:\Project\Feature\A.pas';
+    Edges[1].ConsumerPath := Edges[0].UsedPath;
+    Edges[1].UsedPath := 'C:\Library\B.pas';
+    Analysis.Reachable := Edges;
+    Lines := TConsoleReport.SummaryLines(Analysis);
+    Assert.AreEqual(NativeInt(2), Length(Lines));
+    Assert.IsTrue(Lines[0].Contains('3 arquivos alcancaveis'));
+    Assert.IsTrue(Lines[0].Contains('3 pastas'));
+    Assert.IsTrue(Lines[0].Contains('2 relacoes'));
+    Assert.IsTrue(Lines[1].Contains('Dependencias diretas do DPR: 1'));
   finally
     Analysis.Free;
   end;

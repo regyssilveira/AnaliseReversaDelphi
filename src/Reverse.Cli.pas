@@ -11,6 +11,8 @@ type
   public
     class function DefaultOutputDirectory(const CurrentDirectory,
       ProjectFile, UnitName: string): string; static;
+    class function DefaultProjectMapOutputDirectory(const CurrentDirectory,
+      ProjectFile: string): string; static;
     class function SummaryLines(const Analysis: TAnalysisResult): TArray<string>; static;
   end;
 
@@ -28,6 +30,12 @@ begin
     SameText(Result, 'AUX') or SameText(Result, 'NUL') or
     TRegEx.IsMatch(Result, '^(COM[1-9]|LPT[1-9])$', [roIgnoreCase]) then
     Result := '_' + Result;
+end;
+
+class function TConsoleReport.DefaultProjectMapOutputDirectory(
+  const CurrentDirectory, ProjectFile: string): string;
+begin
+  Result := DefaultOutputDirectory(CurrentDirectory, ProjectFile, 'project-map');
 end;
 
 function CountLabel(const Count: Integer; const Singular, Plural: string): string;
@@ -61,6 +69,46 @@ var
   DirectDeclarations: Integer;
   Partial: Boolean;
 begin
+  if Analysis.Mode = amProjectMap then
+  begin
+    ToProgram := TDictionary<string, Boolean>.Create;
+    Consumers := TDictionary<string, Boolean>.Create;
+    try
+      ToProgram.AddOrSetValue(Key(Analysis.ProgramFile), True);
+      Consumers.AddOrSetValue(Key(ExtractFilePath(Analysis.ProgramFile)), True);
+      DirectDeclarations := 0;
+      for Edge in Analysis.Reachable do
+      begin
+        ToProgram.AddOrSetValue(Key(Edge.ConsumerPath), True);
+        ToProgram.AddOrSetValue(Key(Edge.UsedPath), True);
+        Consumers.AddOrSetValue(Key(ExtractFilePath(Edge.ConsumerPath)), True);
+        Consumers.AddOrSetValue(Key(ExtractFilePath(Edge.UsedPath)), True);
+        if SameText(Edge.ConsumerPath, Analysis.ProgramFile) then
+          Inc(DirectDeclarations);
+      end;
+      Partial := (Analysis.FallbackCount > 0) or (Analysis.FailedCount > 0) or
+        Analysis.PathEvaluationWasFallback or (Analysis.UnresolvedCount > 0) or
+        (Analysis.AmbiguousCount > 0);
+      if Partial then Status := 'parcial' else Status := 'completa';
+      Result := [Format('Mapa: %d arquivos alcancaveis | %d pastas | %d relacoes',
+        [ToProgram.Count, Consumers.Count, Length(Analysis.Reachable)]),
+        Format('Dependencias diretas do DPR: %d | Analise: %s',
+          [DirectDeclarations, Status])];
+      if Partial then
+      begin
+        SetLength(Result, 3);
+        Result[2] := Format('Confira analysis.log: %d nao resolvidas | %d ambiguas | %d falhas | %d fallbacks',
+          [Analysis.UnresolvedCount, Analysis.AmbiguousCount,
+           Analysis.FailedCount, Analysis.FallbackCount]);
+        if Analysis.PathEvaluationWasFallback then
+          Result[2] := Result[2] + ' | MSBuild fallback';
+      end;
+      Exit;
+    finally
+      Consumers.Free;
+      ToProgram.Free;
+    end;
+  end;
   ToProgram := TDictionary<string, Boolean>.Create;
   Consumers := TDictionary<string, Boolean>.Create;
   ByConsumer := TObjectDictionary<string, TList<string>>.Create([doOwnsValues]);

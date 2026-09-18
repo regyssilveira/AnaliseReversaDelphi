@@ -88,6 +88,7 @@ var
   DotPos: Integer;
   Stopwatch: TStopwatch;
   NamespaceName, ChosenAlias: string;
+  GraphStage: string;
   Uncertain: TList<TUncertainReference>;
   Warning: TUncertainReference;
   procedure AddOrigin(const SourceFile: string);
@@ -274,7 +275,9 @@ begin
         Edge.UsedPath + ' -> ' + Edge.ConsumerPath);
     end;
     if FProgress <> nil then FProgress.Report('Resolvendo dependencias', Pending.Count, Pending.Count);
-    if FProgress <> nil then FProgress.Report('Montando grafo reverso', 0, 0);
+    if Result.Mode = amProjectMap then GraphStage := 'Montando mapa do projeto'
+    else GraphStage := 'Montando grafo reverso';
+    if FProgress <> nil then FProgress.Report(GraphStage, 0, 0);
     if Result.Mode = amProjectMap then
       Result.Reachable := Result.Graph.DependenciesReachable(Result.ProgramFile)
     else
@@ -295,7 +298,7 @@ begin
       for I := 0 to High(Result.Routes) do
         Result.Paths[I] := Result.Routes[I].Text;
     end;
-    if FProgress <> nil then FProgress.Report('Montando grafo reverso', 1, 1);
+    if FProgress <> nil then FProgress.Report(GraphStage, 1, 1);
     FLogger.Write('INFO', 'complete', Format('%d parsed; %d fallback; %d failed; %d unresolved; %d ambiguous; %d reachable edges; %d ms',
       [Result.ParsedCount, Result.FallbackCount, Result.FailedCount, Result.UnresolvedCount,
        Result.AmbiguousCount, Length(Result.Reachable), Stopwatch.ElapsedMilliseconds]));

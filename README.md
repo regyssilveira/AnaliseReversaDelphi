@@ -2,17 +2,23 @@
 
 [README em inglês](README.en.md)
 
-Ferramenta console para responder **quem usa uma unit Delphi e por quais caminhos ela chega ao DPR**. A entrada obrigatória é o arquivo `.dproj` e o nome da unit; o caminho do `.pas` é descoberto pelo programa. O resultado contém os caminhos reversos em `result.txt`, um grafo navegável em `graph.html`, as ligações em `graph.dot` e decisões de análise em `analysis.log`.
+Ferramenta console para mapear **tudo que um projeto Delphi usa a partir do DPR** ou responder **quem usa uma unit e por quais caminhos ela chega ao projeto**. Somente o `.dproj` é obrigatório; `--unit` seleciona o modo de backtrace. O resultado contém um relatório em `result.txt`, um grafo navegável em `graph.html`, as ligações em `graph.dot` e decisões de análise em `analysis.log`.
 
 ## Baixar e executar
 
 Baixe o ZIP Win64 ou Win32 na [página da versão mais recente](https://github.com/regyssilveira/delphi-unit-backtrace/releases/latest) e extraia os arquivos. No diretório do projeto, execute:
 
 ```powershell
+D:\Ferramentas\UnitBacktrace.exe --project MeuERP.dproj
+```
+
+Esse comando gera o mapa completo das dependências alcançáveis a partir do DPR. Para o backtrace de uma unit específica:
+
+```powershell
 D:\Ferramentas\UnitBacktrace.exe --project MeuERP.dproj --unit uExtrator
 ```
 
-Sem `--output`, o executável grava em `analysis-output\<projeto>-<identificador>\<unit>` no diretório atual, por exemplo `analysis-output\MeuERP-a1b2c3d4\uExtrator\graph.html`. O identificador deriva do caminho do `.dproj`, para distinguir projetos homônimos em pastas diferentes. Com `--output`, usa exatamente a pasta informada. Se a análise for parcial (código de saída `3`), consulte `analysis.log` antes de decidir quais declarações `uses` alterar. O ZIP inclui as licenças e avisos das dependências.
+Sem `--output`, o mapa fica em `analysis-output\<projeto>-<identificador>\project-map`; o backtrace fica em `analysis-output\<projeto>-<identificador>\<unit>`. O identificador deriva do caminho do `.dproj`, para distinguir projetos homônimos em pastas diferentes. Com `--output`, usa exatamente a pasta informada. Se a análise for parcial (código de saída `3`), consulte `analysis.log`. O ZIP inclui as licenças e avisos das dependências.
 
 ```powershell
 UnitBacktrace.exe --project "D:\MeuERP\MeuERP.dproj" --unit uExtrator --output "D:\Analise"
@@ -34,6 +40,8 @@ cd delphi-unit-backtrace
 .\tools\Build.ps1 -Platform Win64
 .\tools\Build.ps1 -Tests -Platform Win64
 .\bin\Win64\UnitBacktraceTests.exe
+.\bin\Win64\UnitBacktrace.exe --project .\tests\fixtures\Small\Small.dproj --no-global-path --output .\bin\project-map-output
+node .\tests\ProjectMap.Render.test.js .\bin\project-map-output\graph.html
 .\bin\Win64\UnitBacktrace.exe --project .\tests\fixtures\Small\Small.dproj --unit Target --no-global-path --output .\bin\workflow-test
 node .\tests\Visual.Trace.test.js .\bin\workflow-test\graph.html
 node .\tests\Visual.Render.test.js .\bin\workflow-test\graph.html
@@ -42,6 +50,8 @@ node .\tests\Visual.Render.test.js .\bin\workflow-test\graph.html
 O script detecta o Delphi 13 (BDS 37.0) pela variável de ambiente `BDS` ou pelo `RootDir` registrado em HKCU/HKLM e confirma que o compilador da plataforma existe. Os projetos `.dproj` também estão na raiz. DUnitX acompanha o RAD Studio 13; o DelphiAST é um submódulo Git. O teste opcional com Node.js verifica a lógica da cadeia no JavaScript gerado.
 
 O executável para testes locais fica em `bin\Win64\UnitBacktrace.exe`. A análise gera `result.txt`, `graph.dot`, `graph.html` e `analysis.log` na pasta de saída. Abra `graph.html` no navegador para explorar o grafo sem instalar dependências. A busca lista até 30 units encontradas e centraliza a seleção. Ao selecionar um arquivo, o grafo destaca uma cadeia de declarações `uses` até o DPR; se não houver essa ligação, destaca uma cadeia até um arquivo do projeto. Os botões **Anterior** e **Próximo** percorrem cada ligação da cadeia com arquivo, seção e linha, sem limite de passos; **Copiar arquivo:linha** copia a declaração selecionada. Você pode isolar a cadeia, ver ligações diretas ou mostrar todas as rotas resolvidas até o DPR. O zoom, o ajuste da cadeia ou do grafo visível, o arraste e o filtro visual por seção ajudam a percorrer grafos grandes.
+
+No modo padrão, sem `--unit`, a análise começa no DPR e inclui somente arquivos realmente alcançáveis por declarações `uses`, mesmo quando estão no Search Path ou em `--source-root`. O HTML abre na visão **Pastas**, agrega a quantidade de relações entre diretórios e permite alternar para **Units**. A busca aceita pasta, unit ou caminho completo, o filtro separa DPR, `interface` e `implementation`, e a seleção de uma pasta lista seus arquivos com os caminhos completos.
 
 O gráfico abre em modo progressivo com a unit alvo e seus consumidores diretos. No topo, **Visão progressiva** recupera essa visualização limpa e **Grafo completo** mostra todos os arquivos para partir do conjunto inteiro e reduzi-lo com busca, filtros, ocultação de ramos ou isolamento de rotas. A lista **Rotas encontradas** agrupa cadeias por DPR, projeto, biblioteca, ausência de consumidor e ciclo; selecionar uma entrada isola a cadeia. Os controles permitem expandir o próximo nível, expandir até o DPR ou até o final, recolher e ocultar um ramo. Um duplo clique isola rapidamente a rota de uma unit, enquanto apontar o mouse destaca sua cadeia e atenua as ligações não relacionadas. O layout reordena as units pela posição média dos vizinhos para reduzir cruzamentos e mantém DPR, arquivos finais do projeto e raízes de biblioteca na coluna de destinos.
 

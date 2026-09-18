@@ -18,6 +18,7 @@ uses
   Reverse.Progress in 'src\Reverse.Progress.pas',
   Reverse.Analysis in 'src\Reverse.Analysis.pas',
   Reverse.Visual in 'src\Reverse.Visual.pas',
+  Reverse.ProjectMapVisual in 'src\Reverse.ProjectMapVisual.pas',
   Reverse.Cli in 'src\Reverse.Cli.pas',
   Reverse.Output in 'src\Reverse.Output.pas';
 
@@ -58,19 +59,26 @@ begin
   try
     ProjectFile := OptionValue('--project');
     Target := OptionValue('--unit');
-    if (ProjectFile = '') or (Target = '') then
+    if ProjectFile = '' then
     begin
-      Writeln('Usage: UnitBacktrace --project FILE.dproj --unit UnitName [--platform Win32|Win64] [--config Debug|Release] [--source-root DIR ...] [--output DIR] [--no-global-path]');
+      Writeln('Usage: UnitBacktrace --project FILE.dproj [--unit UnitName] [--platform Win32|Win64] [--config Debug|Release] [--source-root DIR ...] [--output DIR] [--no-global-path]');
+      Writeln('Without --unit, generates the complete dependency map from the DPR.');
       ExitCode := 2;
       Exit;
     end;
     OutputDir := OptionValue('--output');
     if OutputDir = '' then
-      OutputDir := TConsoleReport.DefaultOutputDirectory(GetCurrentDir,
-        ProjectFile, Target);
+      if Target = '' then
+        OutputDir := TConsoleReport.DefaultProjectMapOutputDirectory(
+          GetCurrentDir, ProjectFile)
+      else
+        OutputDir := TConsoleReport.DefaultOutputDirectory(GetCurrentDir,
+          ProjectFile, Target);
     TDirectory.CreateDirectory(OutputDir);
     Logger := TFileLogger.Create(TPath.Combine(OutputDir, 'analysis.log'));
-    Logger.Write('INFO', 'start', ProjectFile + ' | ' + Target);
+    if Target = '' then
+      Logger.Write('INFO', 'start-project-map', ProjectFile)
+    else Logger.Write('INFO', 'start', ProjectFile + ' | ' + Target);
     Writeln('Preparando projeto e descobrindo arquivos...');
     UseGlobalSearchPaths := True;
     for I := 1 to ParamCount do
