@@ -10,6 +10,7 @@ uses Reverse.Domain, Reverse.Scope, Reverse.Graph,
 type
   TAnalysisResult = class
   public
+    Mode: TAnalysisMode;
     TargetName: string;
     TargetFile: string;
     ProgramName: string;
@@ -50,6 +51,7 @@ uses System.SysUtils, System.IOUtils, System.Diagnostics;
 constructor TAnalysisResult.Create;
 begin
   inherited;
+  Mode := amUnitBacktrace;
   Graph := TReverseGraph.Create;
   SourceOrigins := TDictionary<string, TSourceOrigin>.Create;
 end;
@@ -141,7 +143,7 @@ begin
         end;
         if SameText(FileName, Scope.ProgramFile) then
           Result.ProgramName := Name;
-        if Key(Name) = Key(Target) then
+        if (Target <> '') and (Key(Name) = Key(Target)) then
         begin
           Inc(Count);
           Result.TargetName := Name;
@@ -165,9 +167,20 @@ begin
       if FProgress <> nil then
         FProgress.Report('Analisando arquivos', Processed, Scope.Files.Count);
     end;
-    if Count = 0 then raise Exception.Create('Unit not found: ' + Target);
-    if Count > 1 then raise Exception.Create('Ambiguous unit: ' + Target +
-      ' (' + Count.ToString + ' candidates; see log)');
+    if Result.ProgramName = '' then
+      raise Exception.Create('Project entry could not be parsed: ' + Scope.ProgramFile);
+    if Target = '' then
+    begin
+      Result.Mode := amProjectMap;
+      Result.TargetName := Result.ProgramName;
+      Result.TargetFile := Result.ProgramFile;
+    end
+    else
+    begin
+      if Count = 0 then raise Exception.Create('Unit not found: ' + Target);
+      if Count > 1 then raise Exception.Create('Ambiguous unit: ' + Target +
+        ' (' + Count.ToString + ' candidates; see log)');
+    end;
     if FProgress <> nil then FProgress.Report('Resolvendo dependencias', 0, Pending.Count);
     for I := 0 to Pending.Count - 1 do
     begin
@@ -262,7 +275,10 @@ begin
     end;
     if FProgress <> nil then FProgress.Report('Resolvendo dependencias', Pending.Count, Pending.Count);
     if FProgress <> nil then FProgress.Report('Montando grafo reverso', 0, 0);
-    Result.Reachable := Result.Graph.Reachable(Result.TargetFile);
+    if Result.Mode = amProjectMap then
+      Result.Reachable := Result.Graph.DependenciesReachable(Result.ProgramFile)
+    else
+      Result.Reachable := Result.Graph.Reachable(Result.TargetFile);
     AddOrigin(Result.TargetFile);
     AddOrigin(Result.ProgramFile);
     for Edge in Result.Reachable do
@@ -271,11 +287,14 @@ begin
       AddOrigin(Edge.ConsumerPath);
     end;
     Result.Uncertain := Uncertain.ToArray;
-    Result.Routes := Result.Graph.ClassifiedPaths(Result.TargetFile,
-      Scope.ProgramFile, Result.SourceOrigins);
-    SetLength(Result.Paths, Length(Result.Routes));
-    for I := 0 to High(Result.Routes) do
-      Result.Paths[I] := Result.Routes[I].Text;
+    if Result.Mode = amUnitBacktrace then
+    begin
+      Result.Routes := Result.Graph.ClassifiedPaths(Result.TargetFile,
+        Scope.ProgramFile, Result.SourceOrigins);
+      SetLength(Result.Paths, Length(Result.Routes));
+      for I := 0 to High(Result.Routes) do
+        Result.Paths[I] := Result.Routes[I].Text;
+    end;
     if FProgress <> nil then FProgress.Report('Montando grafo reverso', 1, 1);
     FLogger.Write('INFO', 'complete', Format('%d parsed; %d fallback; %d failed; %d unresolved; %d ambiguous; %d reachable edges; %d ms',
       [Result.ParsedCount, Result.FallbackCount, Result.FailedCount, Result.UnresolvedCount,

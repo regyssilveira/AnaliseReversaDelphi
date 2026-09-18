@@ -24,6 +24,7 @@ type
     [Test] procedure LimitsPathEnumerationWithoutDroppingGraphEdges;
     [Test] procedure KeepsSameNamedFilesSeparateWhenPathsAreKnown;
     [Test] procedure SkipsIdenticalEdgesButKeepsDifferentEvidence;
+    [Test] procedure TraversesDependenciesFromProjectEntry;
   end;
 
   [TestFixture]
@@ -72,6 +73,7 @@ type
     [Test] procedure ClassifiesDprProjectAndLibraryRoutes;
     [Test] procedure RetainsUnresolvedReferencesForVisualReview;
     [Test] procedure ProjectDefineChangesReverseRoutesBetweenConfigurations;
+    [Test] procedure MapsAllDependenciesReachableFromDpr;
   end;
 
 implementation
@@ -396,6 +398,39 @@ begin
     'C:\LibraryOne\Target.pas')[0].Consumer);
 end;
 
+procedure TGraphTests.TraversesDependenciesFromProjectEntry;
+var
+  Edge: TDependency;
+  Dependencies: TArray<TDependency>;
+begin
+  Edge := Default(TDependency);
+  Edge.Consumer := 'App';
+  Edge.ConsumerPath := 'C:\Project\App.dpr';
+  Edge.SourceFile := Edge.ConsumerPath;
+  Edge.UsedName := 'A';
+  Edge.UsedPath := 'C:\Project\A.pas';
+  Edge.Section := 'program';
+  Edge.Line := 3;
+  FGraph.Add(Edge);
+  Edge.Consumer := 'A';
+  Edge.ConsumerPath := 'C:\Project\A.pas';
+  Edge.SourceFile := Edge.ConsumerPath;
+  Edge.UsedName := 'B';
+  Edge.UsedPath := 'C:\Project\B.pas';
+  Edge.Section := 'interface';
+  FGraph.Add(Edge);
+  Edge.Consumer := 'Detached';
+  Edge.ConsumerPath := 'C:\Project\Detached.pas';
+  Edge.SourceFile := Edge.ConsumerPath;
+  Edge.UsedName := 'Unused';
+  Edge.UsedPath := 'C:\Project\Unused.pas';
+  FGraph.Add(Edge);
+  Dependencies := FGraph.DependenciesReachable('C:\Project\App.dpr');
+  Assert.AreEqual(NativeInt(2), Length(Dependencies));
+  Assert.AreEqual('A', Dependencies[0].UsedName);
+  Assert.AreEqual('B', Dependencies[1].UsedName);
+end;
+
 procedure TAstTests.ExtractsRealUsesWithSectionAndLine;
 var
   Parser: IUnitParser;
@@ -573,6 +608,36 @@ begin
       Assert.AreEqual(Scope.ProjectRoot, Analysis.ProjectRoot);
       Assert.IsTrue(TFile.ReadAllText(TPath.Combine(OutputDir, 'graph.html'))
         .Contains('projectRoot='));
+    finally
+      Analysis.Free;
+    end;
+  finally
+    Analyzer.Free;
+    Scope.Free;
+  end;
+end;
+
+procedure TWorkflowTests.MapsAllDependenciesReachableFromDpr;
+var
+  Logger: ILogger;
+  Scope: TProjectScope;
+  Analyzer: TAnalyzer;
+  Analysis: TAnalysisResult;
+begin
+  Logger := TFileLogger.Create(TPath.GetFullPath(
+    'bin\workflow-test\project-map-analysis.log'));
+  Scope := TProjectScope.Create(TPath.GetFullPath(
+    'tests\fixtures\Small\Small.dproj'), Logger, 'Win64', False);
+  Analyzer := TAnalyzer.Create(TAstUnitParser.Create, Logger);
+  try
+    Analysis := Analyzer.Run(Scope, '');
+    try
+      Assert.AreEqual(amProjectMap, Analysis.Mode);
+      Assert.AreEqual(Analysis.ProgramName, Analysis.TargetName);
+      Assert.AreEqual(Analysis.ProgramFile, Analysis.TargetFile);
+      Assert.AreEqual(NativeInt(5), Length(Analysis.Reachable));
+      Assert.AreEqual(NativeInt(0), Length(Analysis.Routes));
+      Assert.AreEqual(NativeInt(0), Length(Analysis.Paths));
     finally
       Analysis.Free;
     end;

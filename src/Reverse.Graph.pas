@@ -10,6 +10,7 @@ type
   TReverseGraph = class
   private
     FByUsed: TObjectDictionary<string, TList<TDependency>>;
+    FByConsumer: TObjectDictionary<string, TList<TDependency>>;
     FNames: TDictionary<string, string>;
     FSeenEdges: TDictionary<string, Boolean>;
     function GetConsumers(const Used: string): TList<TDependency>;
@@ -20,6 +21,7 @@ type
     destructor Destroy; override;
     procedure Add(const Edge: TDependency);
     function Reachable(const Target: string): TArray<TDependency>;
+    function DependenciesReachable(const Root: string): TArray<TDependency>;
     function Paths(const Target, ProgramName: string;
       MaxPaths: Integer = 10000): TArray<string>;
     function ClassifiedPaths(const Target, ProgramName: string;
@@ -36,6 +38,7 @@ constructor TReverseGraph.Create;
 begin
   inherited;
   FByUsed := TObjectDictionary<string, TList<TDependency>>.Create([doOwnsValues]);
+  FByConsumer := TObjectDictionary<string, TList<TDependency>>.Create([doOwnsValues]);
   FNames := TDictionary<string, string>.Create;
   FSeenEdges := TDictionary<string, Boolean>.Create;
 end;
@@ -44,6 +47,7 @@ destructor TReverseGraph.Destroy;
 begin
   FNames.Free;
   FSeenEdges.Free;
+  FByConsumer.Free;
   FByUsed.Free;
   inherited;
 end;
@@ -72,7 +76,7 @@ end;
 
 procedure TReverseGraph.Add(const Edge: TDependency);
 var
-  List: TList<TDependency>;
+  List, DependencyList: TList<TDependency>;
   UsedKey, ConsumerKey, Identity: string;
 begin
   Identity := DependencyIdentity(Edge);
@@ -95,8 +99,54 @@ begin
     FByUsed.Add(UsedKey, List);
   end;
   List.Add(Edge);
+  if not FByConsumer.TryGetValue(ConsumerKey, DependencyList) then
+  begin
+    DependencyList := TList<TDependency>.Create;
+    FByConsumer.Add(ConsumerKey, DependencyList);
+  end;
+  DependencyList.Add(Edge);
   FNames.AddOrSetValue(UsedKey, Edge.UsedName);
   FNames.AddOrSetValue(ConsumerKey, Edge.Consumer);
+end;
+
+function TReverseGraph.DependenciesReachable(
+  const Root: string): TArray<TDependency>;
+var
+  Queue: TQueue<string>;
+  Seen: TDictionary<string, Boolean>;
+  Output: TList<TDependency>;
+  Current, Next: string;
+  Edge: TDependency;
+  Edges: TList<TDependency>;
+begin
+  Queue := TQueue<string>.Create;
+  Seen := TDictionary<string, Boolean>.Create;
+  Output := TList<TDependency>.Create;
+  try
+    Queue.Enqueue(Key(Root));
+    Seen.Add(Key(Root), True);
+    while Queue.Count > 0 do
+    begin
+      Current := Queue.Dequeue;
+      if not FByConsumer.TryGetValue(Current, Edges) then Continue;
+      for Edge in Edges do
+      begin
+        Output.Add(Edge);
+        if Edge.UsedPath <> '' then Next := Key(Edge.UsedPath)
+        else Next := Key(Edge.UsedName);
+        if not Seen.ContainsKey(Next) then
+        begin
+          Seen.Add(Next, True);
+          Queue.Enqueue(Next);
+        end;
+      end;
+    end;
+    Result := Output.ToArray;
+  finally
+    Output.Free;
+    Seen.Free;
+    Queue.Free;
+  end;
 end;
 
 function TReverseGraph.Reachable(const Target: string): TArray<TDependency>;

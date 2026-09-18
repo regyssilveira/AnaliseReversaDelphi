@@ -7,6 +7,8 @@ interface
 uses System.SysUtils, System.Generics.Collections;
 
 type
+  TAnalysisMode = (amUnitBacktrace, amProjectMap);
+
   TSourceOrigin = (soProject, soProjectReference, soProjectSearchPath,
     soGlobalSearchPath, soAdditionalRoot, soUnknown);
 
