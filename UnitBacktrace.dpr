@@ -16,6 +16,7 @@ uses
   Reverse.DelphiPaths in 'src\Reverse.DelphiPaths.pas',
   Reverse.Log in 'src\Reverse.Log.pas',
   Reverse.Progress in 'src\Reverse.Progress.pas',
+  Reverse.Runner in 'src\Reverse.Runner.pas',
   Reverse.Analysis in 'src\Reverse.Analysis.pas',
   Reverse.Visual in 'src\Reverse.Visual.pas',
   Reverse.ProjectMapVisual in 'src\Reverse.ProjectMapVisual.pas',
@@ -50,9 +51,8 @@ end;
 var
   ProjectFile, Target, OutputDir: string;
   Logger: ILogger;
-  Scope: TProjectScope;
-  Analyzer: TAnalyzer;
   Analysis: TAnalysisResult;
+  Request: TAnalysisRequest;
   I: Integer;
   UseGlobalSearchPaths: Boolean;
 begin
@@ -84,37 +84,25 @@ begin
     for I := 1 to ParamCount do
       if SameText(ParamStr(I), '--no-global-path') then
         UseGlobalSearchPaths := False;
-    Scope := TProjectScope.Create(ProjectFile, Logger,
-      OptionValue('--platform'),
-      UseGlobalSearchPaths, OptionValue('--config'),
-      TMSBuildPathEvaluator.Create(Logger), OptionValues('--source-root'));
+    Request.ProjectFile := ProjectFile;
+    Request.TargetUnit := Target;
+    Request.Platform := OptionValue('--platform');
+    Request.Config := OptionValue('--config');
+    Request.SourceRoots := OptionValues('--source-root');
+    Request.UseGlobalSearchPaths := UseGlobalSearchPaths;
+    Analysis := TAnalysisRunner.Run(Request, Logger, TConsoleProgress.Create);
     try
       Writeln(Format('Arquivos descobertos: %d | %s | %s',
-        [Scope.Files.Count, Scope.Platform, Scope.Config]));
-      Analyzer := TAnalyzer.Create(TAstUnitParser.Create(
-        Scope.SearchDirectories.ToArray, Logger, Scope.Defines.ToArray,
-        Scope.Platform), Logger, TConsoleProgress.Create);
-      try
-        Analysis := Analyzer.Run(Scope, Target);
-        try
-          Writeln('Gravando resultado e log...');
-          TOutputWriter.WriteFiles(Analysis, OutputDir);
-          for var SummaryLine in TConsoleReport.SummaryLines(Analysis) do
-            Writeln(SummaryLine);
-          Writeln('Concluido: ' + OutputDir);
-          Writeln('Abra no navegador: ' + TPath.Combine(OutputDir, 'graph.html'));
-          if (Analysis.FallbackCount > 0) or (Analysis.FailedCount > 0) or
-            Analysis.PathEvaluationWasFallback or
-            (Analysis.UnresolvedCount > 0) or
-            (Analysis.AmbiguousCount > 0) then ExitCode := 3;
-        finally
-          Analysis.Free;
-        end;
-      finally
-        Analyzer.Free;
-      end;
+        [Analysis.DiscoveredCount, Analysis.Platform, Analysis.Config]));
+      Writeln('Gravando resultado e log...');
+      TOutputWriter.WriteFiles(Analysis, OutputDir);
+      for var SummaryLine in TConsoleReport.SummaryLines(Analysis) do
+        Writeln(SummaryLine);
+      Writeln('Concluido: ' + OutputDir);
+      Writeln('Abra no navegador: ' + TPath.Combine(OutputDir, 'graph.html'));
+      if TAnalysisRunner.IsPartial(Analysis) then ExitCode := 3;
     finally
-      Scope.Free;
+      Analysis.Free;
     end;
   except
     on E: Exception do

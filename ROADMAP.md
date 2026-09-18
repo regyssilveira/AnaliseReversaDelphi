@@ -86,6 +86,15 @@ Estes itens agregam valor, mas não bloqueiam a primeira versão estável:
 - relatório adequado para integração contínua, incluindo SARIF se houver um caso de uso comprovado;
 - abertura opcional do arquivo e da linha diretamente no editor configurado pelo usuário.
 
+## Integração com o Delphi 13
+
+- [x] Extrair um núcleo compartilhado entre console e package da IDE.
+- [x] Criar ações para o projeto ativo e a unit aberta sem depender do executável.
+- [x] Executar em segundo plano com progresso, cancelamento e bloqueio de simultaneidade.
+- [ ] Exibir o HTML em um painel acoplável dentro da IDE.
+- [ ] Navegar do gráfico para o arquivo e a linha da declaração `uses`.
+- [ ] Permitir escolher configuração, plataforma, raízes adicionais e uso dos caminhos globais.
+
 ## Fora do escopo atual
 
 - provar uso de símbolos, métodos ou classes dentro de uma unit;

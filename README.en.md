@@ -4,6 +4,8 @@
 
 [Roadmap to version 1.0 (Portuguese)](ROADMAP.md)
 
+[Delphi 13 IDE extension (Portuguese)](IDE.md)
+
 Console tool that maps **everything a Delphi project uses from its DPR** or answers **which files use a selected unit and through which paths it reaches the project**. Only the `.dproj` is required; `--unit` selects backtrace mode. Outputs are a report in `result.txt`, a navigable graph in `graph.html`, links in `graph.dot`, and analysis decisions in `analysis.log`.
 
 ## Download and run
@@ -33,6 +35,10 @@ It scans the project directory and evaluates `DCC_UnitSearchPath`, `DCC_IncludeP
 An additional root broadens the analysis scope; warnings from other library units may also appear in the log.
 
 The code separates models and interfaces (`Reverse.Domain`), source parsing (`Reverse.AST`), project and IDE paths (`Reverse.MSBuild` and `Reverse.DelphiPaths`), source discovery (`Reverse.Scope`), reference resolution (`Reverse.Analysis`), graph traversal (`Reverse.Graph`), and output/logging (`Reverse.Output` and `Reverse.Log`). Interfaces allow the parser, MSBuild evaluator, global path provider, and logger to be replaced in tests or other implementations.
+
+## IDE extension
+
+The `UnitBacktraceIDE.bpl` package integrates both modes into Delphi 13 without depending on the executable. The console and extension compile the same `Reverse.Runner` core; the IDE supplies the active project and unit, runs analysis in the background, exposes progress and cancellation, and opens the HTML when complete. See [IDE.md](IDE.md) for build, installation, and usage instructions in Portuguese.
 
 ## Build and test with Delphi 13
 

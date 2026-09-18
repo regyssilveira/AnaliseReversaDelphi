@@ -14,6 +14,7 @@ uses
   Reverse.Scope in 'src\Reverse.Scope.pas',
   Reverse.Log in 'src\Reverse.Log.pas',
   Reverse.Analysis in 'src\Reverse.Analysis.pas',
+  Reverse.Runner in 'src\Reverse.Runner.pas',
   Reverse.Cli in 'src\Reverse.Cli.pas',
   Reverse.Output in 'src\Reverse.Output.pas',
   Reverse.Tests in 'tests\Reverse.Tests.pas';

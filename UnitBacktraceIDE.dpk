@@ -1,0 +1,39 @@
+// SPDX-License-Identifier: Apache-2.0
+
+package UnitBacktraceIDE;
+
+{$DESIGNONLY}
+{$DESCRIPTION 'Delphi Unit Backtrace IDE'}
+
+requires
+  rtl,
+  vcl,
+  xmlrtl,
+  designide;
+
+contains
+  UnitBacktrace.IDE.Wizard in 'ide\UnitBacktrace.IDE.Wizard.pas',
+  UnitBacktrace.IDE.Progress in 'ide\UnitBacktrace.IDE.Progress.pas',
+  Reverse.Domain in 'src\Reverse.Domain.pas',
+  Reverse.AST in 'src\Reverse.AST.pas',
+  Reverse.Graph in 'src\Reverse.Graph.pas',
+  Reverse.Scope in 'src\Reverse.Scope.pas',
+  Reverse.MSBuild in 'src\Reverse.MSBuild.pas',
+  Reverse.DelphiPaths in 'src\Reverse.DelphiPaths.pas',
+  Reverse.Log in 'src\Reverse.Log.pas',
+  Reverse.Analysis in 'src\Reverse.Analysis.pas',
+  Reverse.Runner in 'src\Reverse.Runner.pas',
+  Reverse.Visual in 'src\Reverse.Visual.pas',
+  Reverse.ProjectMapVisual in 'src\Reverse.ProjectMapVisual.pas',
+  Reverse.Cli in 'src\Reverse.Cli.pas',
+  Reverse.Output in 'src\Reverse.Output.pas',
+  DelphiAST in 'vendor\DelphiAST\Source\DelphiAST.pas',
+  DelphiAST.Classes in 'vendor\DelphiAST\Source\DelphiAST.Classes.pas',
+  DelphiAST.Consts in 'vendor\DelphiAST\Source\DelphiAST.Consts.pas',
+  DelphiAST.SimpleParserEx in 'vendor\DelphiAST\Source\DelphiAST.SimpleParserEx.pas',
+  SimpleParser in 'vendor\DelphiAST\Source\SimpleParser\SimpleParser.pas',
+  SimpleParser.Lexer in 'vendor\DelphiAST\Source\SimpleParser\SimpleParser.Lexer.pas',
+  SimpleParser.Lexer.Types in 'vendor\DelphiAST\Source\SimpleParser\SimpleParser.Lexer.Types.pas',
+  SimpleParser.Types in 'vendor\DelphiAST\Source\SimpleParser\SimpleParser.Types.pas';
+
+end.

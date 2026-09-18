@@ -28,6 +28,9 @@ type
     PathEvaluationWasFallback: Boolean;
     UnresolvedCount: Integer;
     AmbiguousCount: Integer;
+    DiscoveredCount: Integer;
+    Platform: string;
+    Config: string;
     function RouteCount(const Destination: TRouteDestination): Integer;
     constructor Create;
     destructor Destroy; override;
@@ -38,9 +41,11 @@ type
     FParser: IUnitParser;
     FLogger: ILogger;
     FProgress: IAnalysisProgress;
+    FCancellation: IAnalysisCancellation;
   public
     constructor Create(const Parser: IUnitParser; const Logger: ILogger;
-      const Progress: IAnalysisProgress = nil);
+      const Progress: IAnalysisProgress = nil;
+      const Cancellation: IAnalysisCancellation = nil);
     function Run(const Scope: TProjectScope; const Target: string): TAnalysisResult;
   end;
 
@@ -64,12 +69,13 @@ begin
 end;
 
 constructor TAnalyzer.Create(const Parser: IUnitParser; const Logger: ILogger;
-  const Progress: IAnalysisProgress);
+  const Progress: IAnalysisProgress; const Cancellation: IAnalysisCancellation);
 begin
   inherited Create;
   FParser := Parser;
   FLogger := Logger;
   FProgress := Progress;
+  FCancellation := Cancellation;
 end;
 
 function TAnalyzer.Run(const Scope: TProjectScope; const Target: string): TAnalysisResult;
@@ -103,6 +109,8 @@ var
     Uncertain.Add(Warning);
   end;
 begin
+  if (FCancellation <> nil) and FCancellation.IsCancellationRequested then
+    raise EAnalysisCancelled.Create('Análise cancelada pelo usuário.');
   Stopwatch := TStopwatch.StartNew;
   Result := TAnalysisResult.Create;
   Result.ProgramFile := Scope.ProgramFile;
@@ -120,6 +128,8 @@ begin
     if FProgress <> nil then FProgress.Report('Analisando arquivos', 0, Scope.Files.Count);
     for FileName in Scope.Files do
     begin
+      if (FCancellation <> nil) and FCancellation.IsCancellationRequested then
+        raise EAnalysisCancelled.Create('Análise cancelada pelo usuário.');
       Edges.Clear;
       try
         Name := FParser.Parse(FileName, Edges);
@@ -185,6 +195,8 @@ begin
     if FProgress <> nil then FProgress.Report('Resolvendo dependencias', 0, Pending.Count);
     for I := 0 to Pending.Count - 1 do
     begin
+      if (FCancellation <> nil) and FCancellation.IsCancellationRequested then
+        raise EAnalysisCancelled.Create('Análise cancelada pelo usuário.');
       Edge := Pending[I];
       if FProgress <> nil then
         FProgress.Report('Resolvendo dependencias', I, Pending.Count);
@@ -278,6 +290,8 @@ begin
     if Result.Mode = amProjectMap then GraphStage := 'Montando mapa do projeto'
     else GraphStage := 'Montando grafo reverso';
     if FProgress <> nil then FProgress.Report(GraphStage, 0, 0);
+    if (FCancellation <> nil) and FCancellation.IsCancellationRequested then
+      raise EAnalysisCancelled.Create('Análise cancelada pelo usuário.');
     if Result.Mode = amProjectMap then
       Result.Reachable := Result.Graph.DependenciesReachable(Result.ProgramFile)
     else

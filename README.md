@@ -4,6 +4,8 @@
 
 [Roadmap até a versão 1.0](ROADMAP.md)
 
+[Extensão para Delphi 13](IDE.md)
+
 Ferramenta console para mapear **tudo que um projeto Delphi usa a partir do DPR** ou responder **quem usa uma unit e por quais caminhos ela chega ao projeto**. Somente o `.dproj` é obrigatório; `--unit` seleciona o modo de backtrace. O resultado contém um relatório em `result.txt`, um grafo navegável em `graph.html`, as ligações em `graph.dot` e decisões de análise em `analysis.log`.
 
 ## Baixar e executar
@@ -35,6 +37,10 @@ Uma raiz adicional amplia o escopo da análise; avisos de outras units da biblio
 Também encontra arquivos referenciados diretamente pelo DPR, usa `MainSource` quando o DPR tem outro nome e procura includes relativos e em `DCC_IncludePath`. Lê `uses` em `interface` e `implementation` com [DelphiAST](https://github.com/RomanYankovsky/DelphiAST), identifica cada arquivo pelo caminho resolvido e preserva os ramos do grafo. Quando o DelphiAST rejeita uma sintaxe, a ferramenta tenta extrair os `uses` por tokens, registra o fallback e marca o resultado como parcial. Nomes curtos como `Classes` são resolvidos usando a ordem de namespaces do projeto. A enumeração textual é limitada a 10.000 caminhos para evitar explosão combinatória; o DOT conserva todas as ligações alcançáveis. Ciclos e ramos sem consumidores são identificados.
 
 O código separa modelos e interfaces (`Reverse.Domain`), leitura de fontes (`Reverse.AST`), caminhos do projeto e da IDE (`Reverse.MSBuild` e `Reverse.DelphiPaths`), descoberta de fontes (`Reverse.Scope`), resolução de referências (`Reverse.Analysis`), travessia do grafo (`Reverse.Graph`) e saída/log (`Reverse.Output` e `Reverse.Log`). Parser, avaliação MSBuild, provedor de caminhos globais e log usam interfaces para permitir substituição em testes e outras implementações.
+
+## Extensão para a IDE
+
+O package `UnitBacktraceIDE.bpl` integra os dois modos ao Delphi 13 sem depender do executável. Console e extensão compilam o mesmo núcleo `Reverse.Runner`; a IDE fornece o projeto e a unit atuais, executa a análise em segundo plano, mostra progresso e cancelamento e abre o HTML ao concluir. Consulte [IDE.md](IDE.md) para compilação, instalação e uso.
 
 ## Compilar e testar no Delphi 13
 

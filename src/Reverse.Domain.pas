@@ -59,6 +59,14 @@ type
     procedure Report(const Stage: string; Completed, Total: Integer);
   end;
 
+  IAnalysisCancellation = interface
+    ['{B6E4ED8D-D3E4-4B62-99EA-56F93E73A8CF}']
+    procedure RequestCancel;
+    function IsCancellationRequested: Boolean;
+  end;
+
+  EAnalysisCancelled = class(Exception);
+
   IProjectPathEvaluator = interface
     ['{6A18A89C-454A-484E-8971-59E4B3C9927A}']
     function Evaluate(const ProjectFile, Config, Platform,

@@ -76,11 +76,14 @@ type
     [Test] procedure RetainsUnresolvedReferencesForVisualReview;
     [Test] procedure ProjectDefineChangesReverseRoutesBetweenConfigurations;
     [Test] procedure MapsAllDependenciesReachableFromDpr;
+    [Test] procedure RunsAnalysisThroughReusableCore;
+    [Test] procedure CancelsReusableCoreBeforeParsing;
   end;
 
 implementation
 
 uses Reverse.AST, Reverse.Scope, Reverse.Analysis, Reverse.Output, Reverse.Log,
+  Reverse.Runner,
   Reverse.Cli,
   Reverse.Progress,
   Reverse.MSBuild,
@@ -106,12 +109,81 @@ type
     procedure Report(const Stage: string; Completed, Total: Integer);
   end;
 
+  TCancelledAnalysis = class(TInterfacedObject, IAnalysisCancellation)
+  public
+    procedure RequestCancel;
+    function IsCancellationRequested: Boolean;
+  end;
+
 constructor TProgressRecorder.Create;
 begin
   inherited;
   Stages := TList<string>.Create;
   CompletedValues := TList<Integer>.Create;
   Totals := TList<Integer>.Create;
+end;
+
+procedure TWorkflowTests.RunsAnalysisThroughReusableCore;
+var
+  Request: TAnalysisRequest;
+  Analysis: TAnalysisResult;
+  Logger: ILogger;
+begin
+  Request := Default(TAnalysisRequest);
+  Request.ProjectFile := TPath.GetFullPath(
+    'tests\fixtures\Small\Small.dproj');
+  Request.Platform := 'Win64';
+  Request.UseGlobalSearchPaths := False;
+  TDirectory.CreateDirectory(TPath.GetFullPath('bin\workflow-test'));
+  Logger := TFileLogger.Create(TPath.GetFullPath(
+    'bin\workflow-test\runner-analysis.log'));
+  Analysis := TAnalysisRunner.Run(Request, Logger);
+  try
+    Assert.AreEqual(amProjectMap, Analysis.Mode);
+    Assert.AreEqual(4, Analysis.DiscoveredCount);
+    Assert.AreEqual('Win64', Analysis.Platform);
+    Assert.AreEqual('Debug', Analysis.Config);
+    Assert.AreEqual(NativeInt(5), Length(Analysis.Reachable));
+    Assert.IsFalse(TAnalysisRunner.IsPartial(Analysis));
+    Analysis.FailedCount := 1;
+    Assert.IsTrue(TAnalysisRunner.IsPartial(Analysis));
+  finally
+    Analysis.Free;
+  end;
+end;
+
+procedure TCancelledAnalysis.RequestCancel;
+begin
+end;
+
+function TCancelledAnalysis.IsCancellationRequested: Boolean;
+begin
+  Result := True;
+end;
+
+procedure TWorkflowTests.CancelsReusableCoreBeforeParsing;
+var
+  Request: TAnalysisRequest;
+  Logger: ILogger;
+begin
+  Request := Default(TAnalysisRequest);
+  Request.ProjectFile := TPath.GetFullPath(
+    'tests\fixtures\Small\Small.dproj');
+  Request.Platform := 'Win64';
+  Request.UseGlobalSearchPaths := False;
+  Request.Cancellation := TCancelledAnalysis.Create;
+  TDirectory.CreateDirectory(TPath.GetFullPath('bin\workflow-test'));
+  Logger := TFileLogger.Create(TPath.GetFullPath(
+    'bin\workflow-test\cancel-analysis.log'));
+  Assert.WillRaise(
+    procedure
+    var
+      Analysis: TAnalysisResult;
+    begin
+      Analysis := TAnalysisRunner.Run(Request, Logger);
+      Analysis.Free;
+    end,
+    EAnalysisCancelled);
 end;
 
 destructor TProgressRecorder.Destroy;

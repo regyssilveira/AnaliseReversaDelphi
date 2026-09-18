@@ -1,0 +1,19 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <ProjectGuid>{DB48EF1E-45D6-4C35-873F-E52D487B1234}</ProjectGuid>
+    <ProjectVersion>19.0</ProjectVersion>
+    <MainSource>UnitBacktraceIDE.dpk</MainSource>
+    <Config Condition="'$(Config)'==''">Debug</Config>
+    <Platform Condition="'$(Platform)'==''">Win32</Platform>
+    <TargetedPlatforms>1</TargetedPlatforms>
+    <AppType>Package</AppType>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Base)'!='' or '$(Config)'!=''">
+    <DCC_UnitSearchPath>src;ide;vendor\DelphiAST\Source;vendor\DelphiAST\Source\SimpleParser;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
+    <DCC_Namespace>System;Winapi;Vcl;Xml;ToolsAPI;$(DCC_Namespace)</DCC_Namespace>
+    <DCC_BplOutput>bin\IDE</DCC_BplOutput>
+    <DCC_DcpOutput>obj\IDE</DCC_DcpOutput>
+    <DCC_DcuOutput>obj\IDE</DCC_DcuOutput>
+  </PropertyGroup>
+  <Import Project="$(BDS)\Bin\CodeGear.Delphi.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Delphi.Targets')"/>
+</Project>
